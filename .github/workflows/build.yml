@@ -131,7 +131,8 @@ jobs:
         timeout-minutes: 3
         run: |
           echo "Installing production dependencies for Node.js ${{ matrix.node-version }} compatibility test..."
-          pnpm install --prod --no-frozen-lockfile
+          # Skip scripts to avoid husky prepare script error in CI
+          pnpm install --prod --no-frozen-lockfile --ignore-scripts
 
       - name: 🧪 Test Module Imports (ESM & CJS) on Node.js ${{ matrix.node-version }}
         timeout-minutes: 2
