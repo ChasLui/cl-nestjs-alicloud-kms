@@ -6,7 +6,7 @@
 
 所有提交信息必须遵循 [约定式提交](https://www.conventionalcommits.org/zh-hans/) 规范：
 
-```bash
+```txt
 <类型>[可选作用域]: <描述>
 
 [可选正文]
