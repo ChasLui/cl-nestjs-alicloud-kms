@@ -1,80 +1,175 @@
-name: Release
+name: '🚀 Release & Publish'
+
+# 自动语义化版本控制和npm发布工作流
+# 在每次推送到主分支时触发（发布提交除外）
+# 使用规范提交来确定版本更新并生成变更日志
+# CI 测试和覆盖率上传由 build.yml 工作流处理
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
-env:
-  CI: true
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
 
 jobs:
+  # Only run release - CI is handled by build.yml workflow
   release:
-    name: Release
+    name: Semantic Release & Publish
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
+    timeout-minutes: 20
+    if: >-
+      ${{ !startsWith(github.event.head_commit.message, 'chore: release v') }}
+
     steps:
-      - name: Checkout
+      - name: 📥 Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup pnpm
+      - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: latest
 
-      - name: Setup Node.js
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check for release needed
-        id: check
+      - name: 🧹 Clear pnpm cache if needed
         run: |
-          # 获取最新标签
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "Checking pnpm cache status..."
+          pnpm store status || pnpm store prune || true
 
-          # 获取新提交
-          if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --oneline --pretty=format:"%s")
-          else
-            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --pretty=format:"%s")
-          fi
-
-          echo "Recent commits:"
-          echo "$COMMITS"
-
-          # 检查是否需要发布
-          if echo "$COMMITS" | grep -qE "^(feat|fix|perf)(\(.+\))?:" || echo "$COMMITS" | grep -qE "(BREAKING CHANGE|!)"; then
-            echo "release_needed=true" >> $GITHUB_OUTPUT
-            echo "🚀 Release needed"
-          else
-            echo "release_needed=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No release needed"
-          fi
-
-      - name: Run tests
-        if: steps.check.outputs.release_needed == 'true'
+      - name: 📚 Install dependencies
+        timeout-minutes: 5
         run: |
-          pnpm lint
-          pnpm typecheck
-          pnpm test
+          echo "Installing root dependencies..."
+          pnpm install
+          echo "Installing playground dependencies..."
+          cd playground && pnpm install
+
+      - name: 🔍 Quick Build Verification
+        timeout-minutes: 5
+        run: |
+          echo "Running quick build verification before release..."
           pnpm build
+          echo "✅ Build verification successful"
 
-      - name: Configure Git
-        if: steps.check.outputs.release_needed == 'true'
+      - name: 🔍 Check for Releasable Changes
+        id: check-changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "Checking for conventional commits that trigger releases..."
 
-      - name: Release
-        if: steps.check.outputs.release_needed == 'true'
+          # Get the latest commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Latest commit: $COMMIT_MSG"
+
+          # Check if commit follows conventional commit format and should trigger a release
+          if echo "$COMMIT_MSG" | grep -qE "^(feat|fix|perf)(\(.+\))?!?:"; then
+            echo "🚀 Found releasable changes (feat/fix/perf)"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          elif echo "$COMMIT_MSG" | grep -qE "^.+!:"; then
+            echo "🚀 Found breaking change"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          elif echo "$COMMIT_MSG" | grep -qE "BREAKING CHANGE:"; then
+            echo "🚀 Found breaking change in body"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️  No releasable changes found (commit doesn't match feat/fix/perf pattern)"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🚀 Semantic Release with release-it
+        if: steps.check-changes.outputs.should_release == 'true'
+        timeout-minutes: 10
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm release --ci
+        run: |
+          echo "Configuring git for release..."
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "Starting semantic release process..."
+          echo "📊 Analyzing commits for version bump..."
+
+          # Run release-it with CI flag for automatic version determination
+          pnpm release:ci --verbose
+
+          echo "✅ Semantic release completed successfully"
+
+      - name: ⏭️  Skip Release
+        if: steps.check-changes.outputs.should_release != 'true'
+        run: |
+          echo "⏭️  Skipping release - no releasable changes detected"
+          echo "💡 To trigger a release, use conventional commits:"
+          echo "   • feat: for new features (minor version bump)"
+          echo "   • fix: for bug fixes (patch version bump)" 
+          echo "   • feat!: or fix!: for breaking changes (major version bump)"
+          echo "   • Any commit with 'BREAKING CHANGE:' in body (major version bump)"
+
+      - name: 📊 Release Success Summary
+        if: success() && steps.check-changes.outputs.should_release == 'true'
+        run: |
+          # Get the new version from package.json
+          NEW_VERSION=$(node -p "require('./package.json').version")
+
+          echo "## 🎉 Release v${NEW_VERSION} completed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Package Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package**: [cl-nestjs-alicloud-kms](https://www.npmjs.com/package/cl-nestjs-alicloud-kms)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`v${NEW_VERSION}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release**: [View on GitHub](https://github.com/${{ github.repository }}/releases/latest)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changelog**: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [NPM Registry](https://www.npmjs.com/package/cl-nestjs-alicloud-kms)" >> $GITHUB_STEP_SUMMARY
+          echo "- [GitHub Repository](https://github.com/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Documentation](https://github.com/${{ github.repository }}#readme)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Installation" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npm install cl-nestjs-alicloud-kms@${NEW_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "# or" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm add cl-nestjs-alicloud-kms@${NEW_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Skip Release Summary
+        if: success() && steps.check-changes.outputs.should_release != 'true'
+        run: |
+          echo "## ⏭️ Release Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No releasable changes were detected in the latest commit." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 💡 How to Trigger a Release" >> $GITHUB_STEP_SUMMARY
+          echo "Use conventional commit messages:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`feat: add new feature\` → **minor** version bump (0.1.0 → 0.2.0)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`fix: resolve bug issue\` → **patch** version bump (0.1.0 → 0.1.1)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`feat!: breaking change\` → **major** version bump (0.1.0 → 1.0.0)" >> $GITHUB_STEP_SUMMARY
+          echo "- Any commit with \`BREAKING CHANGE:\` in body → **major** version bump" >> $GITHUB_STEP_SUMMARY
+
+      - name: ❌ Release Failure Notification
+        if: failure()
+        run: |
+          echo "## ❌ Release Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The release process encountered an error. Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Common Solutions" >> $GITHUB_STEP_SUMMARY
+          echo "- Check if all CI tests are passing" >> $GITHUB_STEP_SUMMARY
+          echo "- Verify \`NPM_TOKEN\` secret is valid and has publish permissions" >> $GITHUB_STEP_SUMMARY
+          echo "- Ensure no uncommitted changes exist" >> $GITHUB_STEP_SUMMARY
+          echo "- Check if the version already exists on npm" >> $GITHUB_STEP_SUMMARY
+          echo "- Verify conventional commit format is correct" >> $GITHUB_STEP_SUMMARY
