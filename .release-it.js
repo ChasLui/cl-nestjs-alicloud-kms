@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   git: {
     requireCleanWorkingDir: false, // CI环境可能有构建产物
     requireBranch: ['main', 'master'],

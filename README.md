@@ -65,7 +65,7 @@ import { KmsModule } from 'cl-nestjs-alicloud-kms';
         accessKeyId: 'your-access-key-id',
         accessKeySecret: 'your-access-key-secret',
         regionId: 'cn-hangzhou', // 可选，默认为 cn-hangzhou
-        endpoint: 'https://kms.cn-hangzhou.aliyuncs.com', // 必选
+        endpoint: 'https://kms.cn-hangzhou.aliyuncs.com', // 必选，根据区域调整
       },
       defaultSecretName: 'app-config',
       enableLogging: true,
@@ -77,7 +77,54 @@ import { KmsModule } from 'cl-nestjs-alicloud-kms';
 export class AppModule {}
 ```
 
-### 2. 异步配置（推荐）
+### 2. 端点配置详解
+
+正确配置 KMS 端点是成功使用本模块的关键。端点 URL 必须与您的阿里云区域和网关类型匹配：
+
+```typescript
+// 方式1：环境变量配置（推荐）
+KmsModule.forRoot({
+  client: {
+    accessKeyId: process.env.ALICLOUD_ACCESS_KEY_ID!,
+    accessKeySecret: process.env.ALICLOUD_ACCESS_KEY_SECRET!,
+    endpoint: process.env.ALICLOUD_KMS_ENDPOINT!, // 从环境变量读取
+    regionId: process.env.ALICLOUD_REGION_ID || 'cn-hangzhou',
+  },
+}),
+
+// 方式2：直接配置不同区域
+// 华东1（杭州）
+KmsModule.forRoot({
+  client: {
+    endpoint: 'https://kms.cn-hangzhou.aliyuncs.com',
+    regionId: 'cn-hangzhou',
+    // ... 其他配置
+  },
+}),
+
+// 华北2（北京）
+KmsModule.forRoot({
+  client: {
+    endpoint: 'https://kms.cn-beijing.aliyuncs.com',
+    regionId: 'cn-beijing',
+    // ... 其他配置
+  },
+}),
+
+// 专属网关
+KmsModule.forRoot({
+  client: {
+    endpoint: 'https://your-instance-id.kms.cn-hangzhou.aliyuncs.com',
+    regionId: 'cn-hangzhou',
+    // 专属网关可能需要额外配置
+    caCert: 'your-ca-certificate', // 可选
+    ignoreSSL: false, // 可选
+    // ... 其他配置
+  },
+}),
+```
+
+### 3. 异步配置（推荐）
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -92,7 +139,7 @@ import { KmsModule } from 'cl-nestjs-alicloud-kms';
         client: {
           accessKeyId: configService.getOrThrow('ALICLOUD_ACCESS_KEY_ID'),
           accessKeySecret: configService.getOrThrow('ALICLOUD_ACCESS_KEY_SECRET'),
-          endpoint: configService.getOrThrow('ALICLOUD_ENDPOINT'), // 必选
+          endpoint: configService.getOrThrow('ALICLOUD_KMS_ENDPOINT'), // 必选
           regionId: configService.get('ALICLOUD_REGION_ID', 'cn-hangzhou'), // 可选
         },
         defaultSecretName: 'app-config',
@@ -106,7 +153,7 @@ import { KmsModule } from 'cl-nestjs-alicloud-kms';
 export class AppModule {}
 ```
 
-### 3. 在服务中使用
+### 4. 在服务中使用
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -272,25 +319,7 @@ interface BatchSecretResult {
 
 #### 🆕 **缓存管理方法**
 
-##### `clearSecretCache(secretName: string): boolean`
-
-清除指定密钥的缓存。
-
-##### `clearAllCache(): void`
-
-清除所有密钥缓存。
-
-##### `refreshSecretCache(secretName: string): Promise<string>`
-
-刷新指定密钥的缓存（先清除，再重新获取）。
-
-##### `warmupCache(secretNames: string[], force?: boolean): Promise<void>`
-
-预热缓存，批量加载密钥到缓存。
-
-##### `getCacheStats(): CacheStats | null`
-
-获取缓存统计信息。
+详细的缓存管理 API 请参见下方的 [缓存管理 API](#缓存管理-api) 部分。
 
 ## 🚀 缓存功能
 
@@ -310,7 +339,7 @@ import { KmsModule } from 'cl-nestjs-alicloud-kms';
         accessKeyId: 'your-access-key-id',
         accessKeySecret: 'your-access-key-secret',
         regionId: 'cn-hangzhou', // 可选
-        endpoint: 'https://kms.cn-hangzhou.aliyuncs.com', // 必选
+        endpoint: 'https://kms.cn-hangzhou.aliyuncs.com', // 必选，根据区域调整
       },
       enableLogging: true,
       // 启用缓存配置
@@ -343,7 +372,7 @@ export interface SecretCacheOptions {
 
 ### 缓存管理 API
 
-##### `clearSecretCache(secretName: string): boolean`
+#### `clearSecretCache(secretName: string): boolean`
 
 清除指定密钥的缓存。
 
@@ -352,7 +381,7 @@ const cleared = await kmsService.clearSecretCache('my-secret');
 console.log('缓存已清除:', cleared);
 ```
 
-##### `clearAllCache(): void`
+#### `clearAllCache(): void`
 
 清除所有密钥缓存。
 
@@ -360,7 +389,7 @@ console.log('缓存已清除:', cleared);
 kmsService.clearAllCache();
 ```
 
-##### `refreshSecretCache(secretName: string): Promise<string>`
+#### `refreshSecretCache(secretName: string): Promise<string>`
 
 刷新指定密钥的缓存。
 
@@ -368,7 +397,7 @@ kmsService.clearAllCache();
 const newValue = await kmsService.refreshSecretCache('my-secret');
 ```
 
-##### `warmupCache(secretNames: string[], force?: boolean): Promise<void>`
+#### `warmupCache(secretNames: string[], force?: boolean): Promise<void>`
 
 预热缓存，批量加载密钥到缓存。
 
@@ -380,7 +409,7 @@ await kmsService.warmupCache(['app/database/config', 'app/redis/config', 'app/oa
 await kmsService.warmupCache(secretNames, true);
 ```
 
-##### `getCacheStats(): CacheStats | null`
+#### `getCacheStats(): CacheStats | null`
 
 获取缓存统计信息。
 
@@ -637,9 +666,76 @@ export class EnvironmentConfigService {
 设置以下环境变量：
 
 ```bash
+# 阿里云访问凭证（必需）
 ALICLOUD_ACCESS_KEY_ID=your-access-key-id
 ALICLOUD_ACCESS_KEY_SECRET=your-access-key-secret
-ALICLOUD_REGION_ID=cn-hangzhou  # 可选，默认为 cn-hangzhou
+
+# KMS 服务端点（必需）
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-hangzhou.aliyuncs.com
+
+# 区域配置（可选，默认为 cn-hangzhou）
+ALICLOUD_REGION_ID=cn-hangzhou
+```
+
+### 端点配置说明
+
+KMS 服务端点 (`ALICLOUD_KMS_ENDPOINT`) 是**必需**的配置项，根据您的阿里云区域和网关类型选择：
+
+#### 🌐 共享网关端点（推荐）
+
+```bash
+# 华东1（杭州）
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-hangzhou.aliyuncs.com
+
+# 华北2（北京）
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-beijing.aliyuncs.com
+
+# 华东2（上海）
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-shanghai.aliyuncs.com
+
+# 华南1（深圳）
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-shenzhen.aliyuncs.com
+
+# 中国香港
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-hongkong.aliyuncs.com
+
+# 美国西部1（硅谷）
+ALICLOUD_KMS_ENDPOINT=https://kms.us-west-1.aliyuncs.com
+
+# 欧洲中部1（法兰克福）
+ALICLOUD_KMS_ENDPOINT=https://kms.eu-central-1.aliyuncs.com
+```
+
+#### 🔒 专属网关端点
+
+如果您使用阿里云 KMS 专属网关，请使用您的专属实例端点：
+
+```bash
+# 专属网关示例
+ALICLOUD_KMS_ENDPOINT=https://your-instance-id.kms.cn-hangzhou.aliyuncs.com
+```
+
+#### 📝 端点选择指南
+
+1. **区域就近原则**：选择距离您的应用服务器最近的区域
+2. **合规要求**：根据数据合规要求选择合适的区域
+3. **网关类型**：
+   - **共享网关**：成本较低，适用于大多数场景
+   - **专属网关**：更高安全性和性能，适用于企业级应用
+
+#### ⚠️ 常见配置错误
+
+```bash
+# ❌ 错误：缺少协议
+ALICLOUD_KMS_ENDPOINT=kms.cn-hangzhou.aliyuncs.com
+
+# ❌ 错误：区域不匹配
+ALICLOUD_REGION_ID=cn-beijing
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-hangzhou.aliyuncs.com
+
+# ✅ 正确：协议和区域匹配
+ALICLOUD_REGION_ID=cn-hangzhou
+ALICLOUD_KMS_ENDPOINT=https://kms.cn-hangzhou.aliyuncs.com
 ```
 
 ## 故障排除
@@ -673,14 +769,39 @@ ALICLOUD_REGION_ID=cn-hangzhou  # 可选，默认为 cn-hangzhou
 - 🆕 自动重试机制处理临时网络问题
 - 🆕 支持专属网关配置（caCert、ignoreSSL）
 
-### 5. 🆕 多密钥配置问题
+### 5. 🆕 端点配置问题
+
+- ✅ 确保 `ALICLOUD_KMS_ENDPOINT` 环境变量已正确设置
+- ✅ 验证端点 URL 格式：必须以 `https://` 开头
+- ✅ 检查端点区域与 `ALICLOUD_REGION_ID` 一致性
+- ✅ 专属网关用户检查实例 ID 和端点 URL 正确性
+- 🆕 常见端点格式：
+
+  ```bash
+  # 共享网关
+  https://kms.{region-id}.aliyuncs.com
+
+  # 专属网关
+  https://{instance-id}.kms.{region-id}.aliyuncs.com
+  ```
+
+- 🆕 使用正确的区域代码：
+  - `cn-hangzhou`（华东1）
+  - `cn-beijing`（华北2）
+  - `cn-shanghai`（华东2）
+  - `cn-shenzhen`（华南1）
+  - `cn-hongkong`（香港）
+  - `us-west-1`（美西1）
+  - `eu-central-1`（欧洲中部1）
+
+### 6. 🆕 多密钥配置问题
 
 - 验证 `SecretConfigMapping` 配置正确性
 - 检查必需密钥是否都能成功获取
 - 使用验证规则确保密钥值符合预期格式
 - 查看 `BatchSecretResult` 中的错误详情
 
-### 6. 🆕 性能和重试问题
+### 7. 🆕 性能和重试问题
 
 - 调整 `maxRetries` 和 `timeout` 配置
 - 监控并发请求数量（默认限制10个）
