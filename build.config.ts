@@ -15,6 +15,12 @@ export default defineBuildConfig({
     esbuild: {
       target: 'node18',
       minify: false,
+      tsconfigRaw: {
+        compilerOptions: {
+          experimentalDecorators: true,
+          emitDecoratorMetadata: true,
+        },
+      },
     },
   },
   outDir: 'dist',
@@ -27,5 +33,9 @@ export default defineBuildConfig({
     'child_process',
     'util',
     'perf_hooks',
+    '@nestjs/common',
+    '@nestjs/core',
+    '@alicloud/kms20160120',
+    'reflect-metadata',
   ],
 });

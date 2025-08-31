@@ -1,187 +1,172 @@
-#!/usr/bin/env node
-import * as lib from '../src/index.js';
+/**
+ * KMS Module Configuration Utilities Demo
+ *
+ * This file demonstrates the configuration utilities provided by cl-nestjs-alicloud-kms.
+ * For a full NestJS application demo, run: pnpm dev
+ */
 
-// Console colors
-const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-};
+import { mergeConfig, unflattenConfig, flattenConfig, validateRequiredKeys, filterEmptyValues } from '@/index';
 
-function colorize(color: keyof typeof colors, text: string): string {
-  return `${colors[color]}${text}${colors.reset}`;
-}
+console.log('🧰 KMS Configuration Utilities Demo\n');
+console.log('💡 For a full NestJS application demo, run: pnpm dev\n');
 
-function header(text: string): void {
-  console.log(colorize('cyan', `\n=== ${text} ===`));
-}
+// Demonstrate utility functions
+function demonstrateUtilities() {
+  console.log('📦 Configuration Utilities Demonstration\n');
 
-function success(text: string): void {
-  console.log(colorize('green', `✓ ${text}`));
-}
+  // 1. Merge Config
+  console.log('1️⃣ Merge Config:');
+  const localConfig = {
+    'database.host': 'localhost',
+    'database.port': '5432',
+    'redis.port': '6379',
+  };
 
-function info(text: string): void {
-  console.log(colorize('blue', `ℹ ${text}`));
-}
+  const remoteConfig = {
+    'database.host': 'prod-db.example.com',
+    'database.port': '5432',
+    'database.password': 'secret123',
+    'redis.port': '6379',
+    'redis.host': 'redis.example.com',
+  };
 
-// Demo functions
-async function demonstrateStringUtils(): Promise<void> {
-  header('String Utilities');
+  const mergedConfig = mergeConfig(localConfig, remoteConfig);
+  console.log('   Local config:', localConfig);
+  console.log('   Remote config:', remoteConfig);
+  console.log('   Merged config:', mergedConfig);
+  console.log('   ✅ Remote config takes precedence\n');
 
-  const testString = 'Hello World! This is a test string.';
+  // 2. Unflatten Config
+  console.log('2️⃣ Unflatten Config:');
+  const flatConfig = {
+    'app.database.host': 'localhost',
+    'app.database.port': 5432,
+    'app.redis.host': 'redis-server',
+    'app.features.caching': true,
+  };
 
-  console.log(`Original string: "${testString}"`);
-  console.log(`Capitalized: "${lib.capitalize(testString)}"`);
-  console.log(`Slugified: "${lib.slugify(testString)}"`);
-  console.log(`Truncated (20): "${lib.truncate(testString, 20)}"`);
-  console.log(`Truncated (20, '***'): "${lib.truncate(testString, 20, '***')}"`);
+  const unflattened = unflattenConfig(flatConfig);
+  console.log('   Flat config:', flatConfig);
+  console.log('   Unflattened config:', JSON.stringify(unflattened, null, 2));
+  console.log('   ✅ Converted to nested structure\n');
 
-  success('String utilities demo completed');
-}
+  // 3. Flatten Config
+  console.log('3️⃣ Flatten Config:');
+  const nestedConfig = {
+    database: {
+      connection: {
+        host: 'localhost',
+        port: 5432,
+      },
+      credentials: {
+        username: 'admin',
+        password: 'secret',
+      },
+    },
+    features: {
+      caching: true,
+      logging: false,
+    },
+  };
 
-async function demonstrateArrayUtils(): Promise<void> {
-  header('Array Utilities');
+  const flattened = flattenConfig(nestedConfig);
+  console.log('   Nested config:', JSON.stringify(nestedConfig, null, 2));
+  console.log('   Flattened config:', flattened);
+  console.log('   ✅ Converted to flat structure\n');
 
-  const testArray = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  const duplicateArray = [1, 2, 2, 3, 3, 3, 4, 5];
-
-  console.log(`Original array: [${testArray.join(', ')}]`);
-  console.log(
-    `Chunked (size 3): [${lib
-      .chunk(testArray, 3)
-      .map((chunk) => `[${chunk.join(', ')}]`)
-      .join(', ')}]`,
-  );
-  console.log(`Shuffled: [${lib.shuffle([...testArray]).join(', ')}]`);
-
-  console.log(`\nArray with duplicates: [${duplicateArray.join(', ')}]`);
-  console.log(`Unique values: [${lib.unique(duplicateArray).join(', ')}]`);
-
-  success('Array utilities demo completed');
-}
-
-async function demonstrateAsyncUtils(): Promise<void> {
-  header('Async Utilities');
-
-  info('Testing delay function (1 second)...');
-  const start = Date.now();
-  await lib.delay(1000);
-  const elapsed = Date.now() - start;
-  success(`Delay completed, elapsed time: ${elapsed}ms`);
-
-  info('Testing retry function...');
-  let attempts = 0;
-  const unreliableFunction = async (): Promise<string> => {
-    attempts++;
-    if (attempts < 3) {
-      throw new Error(`Attempt ${attempts} failed`);
-    }
-    return `Attempt ${attempts} succeeded`;
+  // 4. Validate Required Keys
+  console.log('4️⃣ Validate Required Keys:');
+  const config = {
+    host: 'localhost',
+    port: 3000,
+    name: 'myapp',
   };
 
   try {
-    const result = await lib.retry(unreliableFunction, 5, 100);
-    success(`Retry result: ${result}`);
-  } catch (err) {
-    console.error(`Retry failed: ${err}`);
+    validateRequiredKeys(config, ['host', 'port']);
+    console.log('   ✅ All required keys present');
+  } catch (error) {
+    console.log('   ❌ Missing required keys:', error instanceof Error ? error.message : String(error));
   }
 
-  success('Async utilities demo completed');
-}
-
-async function demonstrateValidationUtils(): Promise<void> {
-  header('Validation Utilities');
-
-  const emails = ['test@example.com', 'invalid.email', 'user@domain.co.uk'];
-  const urls = ['https://example.com', 'http://localhost:3000/path', 'not-a-url'];
-  const values = ['', ' ', null, undefined, [], {}, 'hello', [1, 2, 3], { a: 1 }];
-
-  console.log('Email validation:');
-  emails.forEach((email) => {
-    console.log(`  "${email}": ${lib.isEmail(email) ? '✓' : '✗'}`);
-  });
-
-  console.log('\nURL validation:');
-  urls.forEach((url) => {
-    console.log(`  "${url}": ${lib.isUrl(url) ? '✓' : '✗'}`);
-  });
-
-  console.log('\nEmpty value checks:');
-  values.forEach((value) => {
-    const display = value === null ? 'null' : value === undefined ? 'undefined' : JSON.stringify(value);
-    console.log(`  ${display}: ${lib.isEmpty(value) ? 'empty' : 'not empty'}`);
-  });
-
-  success('Validation utilities demo completed');
-}
-
-async function demonstrateObjectUtils(): Promise<void> {
-  header('Object Utilities');
-
-  const obj1 = { a: 1, b: { c: 2, d: 3 } };
-  const obj2 = { b: { e: 4 }, f: 5 };
-  const merged = lib.deepMerge(obj1, obj2);
-
-  console.log('Object 1:', JSON.stringify(obj1, null, 2));
-  console.log('Object 2:', JSON.stringify(obj2, null, 2));
-  console.log('Deep merged:', JSON.stringify(merged, null, 2));
-
-  const sampleObj = { name: 'John', age: 30, city: 'New York', country: 'USA' };
-  const picked = lib.pick(sampleObj, ['name', 'city']);
-
-  console.log(`\nOriginal object: ${JSON.stringify(sampleObj)}`);
-  console.log(`Picked ['name', 'city']: ${JSON.stringify(picked)}`);
-
-  console.log(`\nisObject({}): ${lib.isObject({})}`);
-  console.log(`isObject([]): ${lib.isObject([])}`);
-  console.log(`isObject(null): ${lib.isObject(null)}`);
-  console.log(`isObject('string'): ${lib.isObject('string')}`);
-
-  success('Object utilities demo completed');
-}
-
-async function runAllDemos(): Promise<void> {
-  console.log(colorize('bright', '🚀 Node.js TypeScript Library - Interactive Playground'));
-  console.log(colorize('yellow', 'Demonstrating all available utility functions...\n'));
-
-  const demos = [
-    demonstrateStringUtils,
-    demonstrateArrayUtils,
-    demonstrateAsyncUtils,
-    demonstrateValidationUtils,
-    demonstrateObjectUtils,
-  ];
-
-  for (const demo of demos) {
-    try {
-      await demo();
-      await lib.delay(500); // Small delay between demos for better readability
-    } catch (err) {
-      console.error(`Demo failed: ${err}`);
-    }
+  try {
+    validateRequiredKeys(config, ['host', 'port'] as (keyof typeof config)[]);
+    console.log('   ✅ All required keys present');
+  } catch (error) {
+    console.log('   ❌ Missing required keys:', error instanceof Error ? error.message : String(error));
   }
+  console.log();
 
-  header('All Demos Completed');
-  console.log(colorize('green', '✨ All utility functions have been successfully demonstrated!'));
-  console.log(
-    colorize('yellow', 'Check the src/index.ts source code to understand the implementation of these utilities.'),
-  );
+  // 5. Filter Empty Values
+  console.log('5️⃣ Filter Empty Values:');
+  const configWithEmpties = {
+    host: 'localhost',
+    port: '',
+    name: null,
+    password: undefined,
+    enabled: true,
+    count: 0,
+  };
+
+  const filtered = filterEmptyValues(configWithEmpties);
+  console.log('   Original config:', configWithEmpties);
+  console.log('   Filtered config:', filtered);
+  console.log('   ✅ Empty values removed (keeps 0 and false)\n');
 }
 
-// Handle command line arguments
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const args = process.argv.slice(2);
+// Show NestJS integration information
+function showNestJSIntegration() {
+  console.log('🚀 NestJS Integration Demo\n');
 
-  if (args.length === 0) {
-    runAllDemos().catch((err) => {
-      console.error('Demo failed:', err);
-      process.exit(1);
-    });
-  } else {
-    console.log(colorize('yellow', 'Usage: tsx playground/index.ts'));
-    console.log(colorize('yellow', 'This will run all available utility demonstrations.'));
+  console.log('To see a full NestJS application demo with KMS integration, run:');
+  console.log('   pnpm dev\n');
+
+  console.log('This will start a NestJS server with the following endpoints:');
+  console.log('   🏠 Application: http://localhost:3000');
+  console.log('   🔐 KMS Health: http://localhost:3000/api/kms/health');
+  console.log('   ⚙️  Config Demo: http://localhost:3000/api/config/demo');
+  console.log('   📊 KMS Info: http://localhost:3000/api/kms/info\n');
+}
+
+// Show common troubleshooting tips
+function showTroubleshootingTips() {
+  console.log('🔧 Troubleshooting Tips\n');
+
+  console.log('1️⃣ Authentication Issues:');
+  console.log('   • Verify ALICLOUD_ACCESS_KEY_ID and ALICLOUD_ACCESS_KEY_SECRET');
+  console.log('   • Check IAM permissions for KMS:GetSecretValue');
+  console.log('   • Ensure correct regionId configuration\n');
+
+  console.log('2️⃣ Secret Not Found:');
+  console.log('   • Verify secret name spelling');
+  console.log('   • Check secret exists in the specified region');
+  console.log('   • Confirm access permissions to the specific secret\n');
+
+  console.log('3️⃣ JSON Parse Errors:');
+  console.log('   • Validate secret content is valid JSON');
+  console.log('   • Use getSecretValue() for non-JSON secrets');
+  console.log('   • Check for encoding issues\n');
+
+  console.log('4️⃣ Connection Issues:');
+  console.log('   • Use checkConnection() method to test connectivity');
+  console.log('   • Verify network access to KMS endpoints');
+  console.log('   • Check firewall and proxy settings\n');
+}
+
+// Main demo execution
+async function runDemo() {
+  try {
+    demonstrateUtilities();
+    showNestJSIntegration();
+    showTroubleshootingTips();
+
+    console.log('🎉 Configuration utilities demo completed!');
+    console.log('📚 For more information, check out the documentation at:');
+    console.log('   https://github.com/ChasLui/cl-nestjs-alicloud-kms\n');
+  } catch (error) {
+    console.error('❌ Demo error:', error);
   }
 }
+
+// Run the demo
+runDemo();

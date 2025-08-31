@@ -1,18 +1,18 @@
 {
-  "name": "node-typescript-library-starter",
-  "version": "0.0.0",
-  "description": "A clean Node.js TypeScript library starter template with essential string, array, object, async, and validation utilities",
+  "name": "cl-nestjs-alicloud-kms",
+  "version": "0.0.1",
+  "description": "用于集成阿里云 KMS（密钥管理服务）以获取密钥和配置的 NestJS 模块",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chaslui/typescript-library-starter.git"
+    "url": "git+https://github.com/ChasLui/cl-nestjs-alicloud-kms.git"
   },
-  "homepage": "https://github.com/chaslui/typescript-library-starter",
+  "homepage": "https://github.com/ChasLui/cl-nestjs-alicloud-kms",
   "license": "MIT",
   "scripts": {
-    "playground": "tsx playground/index.ts",
+    "playground": "tsx playground/main.ts",
     "playground:build": "rimraf dist-playground && unbuild --config playground.config.ts && chmod +x dist-playground/index.mjs",
     "playground:run": "node dist-playground/index.mjs",
-    "dev": "tsx playground/index.ts",
+    "dev": "tsx playground/main.ts",
     "build": "rimraf dist && unbuild",
     "build:dev": "unbuild --stub",
     "build:all": "pnpm build && pnpm playground:build",
@@ -30,16 +30,16 @@
     "*": "prettier -w -u"
   },
   "keywords": [
+    "nestjs",
+    "alicloud",
+    "kms",
+    "key-management",
+    "secrets",
+    "configuration",
     "typescript",
-    "esm",
-    "cjs",
-    "commonjs",
-    "modules",
-    "nodejs",
-    "utilities",
-    "unbuild",
-    "vitest",
-    "eslint"
+    "aliyun",
+    "cloud",
+    "security"
   ],
   "author": "ChasLui <chaslui@outlook.com> (https://twitter.com/chaslui1)",
   "type": "module",
@@ -73,6 +73,9 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@eslint/js": "^9.34.0",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/testing": "^11.1.6",
     "@types/node": "^24.3.0",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.34.0",
@@ -91,9 +94,18 @@
     "vitest": "^3.2.4"
   },
   "bugs": {
-    "url": "https://github.com/chaslui/typescript-library-starter/issues"
+    "url": "https://github.com/ChasLui/cl-nestjs-alicloud-kms/issues"
   },
   "directories": {
     "test": "tests"
+  },
+  "dependencies": {
+    "@alicloud/kms20160120": "^2.3.1",
+    "type-fest": "^4.41.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "reflect-metadata": "^0.2.2"
   }
 }

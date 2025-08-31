@@ -34,7 +34,7 @@ export default tseslint.config(
 
       // TypeScript specific rules
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-inferrable-types': 'off',
@@ -50,7 +50,7 @@ export default tseslint.config(
   {
     files: ['**/*.test.{ts,tsx,js,jsx}', '**/*.spec.{ts,tsx,js,jsx}'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
+      // Test files also enforce strict any rules
     },
   },
 

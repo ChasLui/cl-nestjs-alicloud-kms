@@ -15,17 +15,20 @@
     "skipLibCheck": true,
     "noEmit": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
+    "noImplicitAny": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "~/*": ["./playground/*"]
     },
-    "types": ["node"]
+    "types": ["node", "vitest/globals"]
   },
   "include": ["src", "playground", "tests"],
   "exclude": ["node_modules", "dist", "dist-playground"]
