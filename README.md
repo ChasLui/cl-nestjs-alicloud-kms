@@ -1,9 +1,17 @@
-# cl-nestjs-alicloud-kms
+<p align="center">
+  <a href="http://nestjs.com"><img alt="Nest Logo" src="https://nestjs.com/img/logo-small.svg" width="120"></a>
+</p>
 
-一个用于 NestJS 的阿里云 KMS（密钥管理服务）集成模块，用于安全地获取和管理密钥配置。
+<h1 align="center">
+  cl-nestjs-alicloud-kms
+</h1>
 
 [![npm version](https://badge.fury.io/js/cl-nestjs-alicloud-kms.svg)](https://badge.fury.io/js/cl-nestjs-alicloud-kms)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://github.com/ChasLui/cl-nestjs-alicloud-kms/workflows/%F0%9F%94%A7%20CI%20-%20Build%20%26%20Test/badge.svg)](https://github.com/ChasLui/cl-nestjs-alicloud-kms/actions)
+[![codecov](https://codecov.io/github/ChasLui/cl-nestjs-alicloud-kms/graph/badge.svg?token=HKXSC0QQEY)](https://codecov.io/github/ChasLui/cl-nestjs-alicloud-kms)
+
+> 一个用于 NestJS 的阿里云 KMS（密钥管理服务）集成模块，用于安全地获取和管理密钥配置。
 
 ## 特性
 
