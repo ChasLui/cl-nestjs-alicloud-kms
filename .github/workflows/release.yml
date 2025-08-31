@@ -55,9 +55,9 @@ jobs:
         timeout-minutes: 5
         run: |
           echo "Installing root dependencies..."
-          pnpm install
+          pnpm install --no-frozen-lockfile
           echo "Installing playground dependencies..."
-          cd playground && pnpm install
+          cd playground && pnpm install --no-frozen-lockfile
 
       - name: 🔍 Quick Build Verification
         timeout-minutes: 5
