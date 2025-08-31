@@ -45,10 +45,9 @@
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
+    "node": ">=20.0.0",
+    "pnpm": ">=10.15.0"
   },
-  "packageManager": "pnpm@8.15.0",
   "exports": {
     ".": {
       "import": {
@@ -58,8 +57,14 @@
       "require": {
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
-      }
-    }
+      },
+      "node": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      },
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -100,12 +105,12 @@
     "test": "tests"
   },
   "dependencies": {
-    "@alicloud/kms20160120": "^2.3.1",
     "type-fest": "^4.41.0"
   },
   "peerDependencies": {
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
+    "@alicloud/kms20160120": "^2.3.1",
     "reflect-metadata": "^0.2.2"
   }
 }
