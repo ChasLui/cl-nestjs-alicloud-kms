@@ -9,7 +9,7 @@ import {
   type LoggerInterface,
 } from '../src/index';
 
-// Mock KmsClient to prevent real KMS connections
+// 模拟KmsClient以防止真实的KMS连接
 const mockKmsClient = {
   getSecretValue: vi.fn(),
 };
