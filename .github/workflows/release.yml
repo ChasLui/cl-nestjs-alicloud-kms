@@ -1,24 +1,142 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      release-type:
-        description: 'Release type (patch, minor, major)'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
+  push:
+    branches: [main]
 
 env:
+  CI: true
   FORCE_COLOR: 3
 
 jobs:
-  release:
+  # 检查是否需要发布
+  check-release:
+    name: Check if release is needed
     runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+      release-type: ${{ steps.check.outputs.release-type }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整提交历史
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check conventional commits and determine release type
+        id: check
+        run: |
+          echo "Checking recent commits for conventional commit patterns..."
+
+          # 获取最后一个标签
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tags found, checking all commits"
+            COMMITS=$(git log --oneline --pretty=format:"%s")
+          else
+            echo "Last tag: $LAST_TAG"
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --pretty=format:"%s")
+          fi
+
+          echo "Recent commits:"
+          echo "$COMMITS"
+
+          # 检查是否有发布相关的提交
+          SHOULD_RELEASE="false"
+          RELEASE_TYPE="patch"
+
+          # 检查破坏性变更 (major)
+          if echo "$COMMITS" | grep -qE "(BREAKING CHANGE|!:)"; then
+            SHOULD_RELEASE="true"
+            RELEASE_TYPE="major"
+            echo "Found breaking changes - major release needed"
+          # 检查新功能 (minor)  
+          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+            SHOULD_RELEASE="true"
+            RELEASE_TYPE="minor"
+            echo "Found new features - minor release needed"
+          # 检查修复和其他变更 (patch)
+          elif echo "$COMMITS" | grep -qE "^(fix|perf|revert)(\(.+\))?:"; then
+            SHOULD_RELEASE="true"
+            RELEASE_TYPE="patch"
+            echo "Found fixes or performance improvements - patch release needed"
+          fi
+
+          # 跳过chore类型的提交，除非明确包含release
+          if echo "$COMMITS" | grep -qE "^chore(\(.+\))?: release"; then
+            echo "Found manual release commit, skipping auto-release"
+            SHOULD_RELEASE="false"
+          fi
+
+          echo "should-release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+          echo "release-type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
+          echo "Release decision: should-release=$SHOULD_RELEASE, type=$RELEASE_TYPE"
+
+  # 运行测试和构建（只有在需要发布时才运行）
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    needs: check-release
+    if: needs.check-release.outputs.should-release == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint code
+        run: pnpm lint
+
+      - name: Run tests with coverage
+        run: pnpm coverage
+
+      - name: Build library
+        run: pnpm build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-artifacts
+          path: |
+            dist/
+            package.json
+            README.md
+            LICENSE
+          retention-days: 1
+
+  # 发布到npm和GitHub
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [check-release, test-and-build]
+    if: needs.check-release.outputs.should-release == 'true'
     permissions:
       contents: write
       issues: write
@@ -31,32 +149,61 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
-      - name: Build and test
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-artifacts
+          path: ./
+
+      - name: Configure Git
         run: |
-          pnpm build
-          pnpm test
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Git Identity
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
-      - name: Release
-        run: pnpm release --increment=${{ github.event.inputs.release-type }} --ci
+      - name: Generate changelog and create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Starting release process..."
+          echo "Release type: ${{ needs.check-release.outputs.release-type }}"
+
+          # 使用release-it进行自动化发布
+          # CI模式：非交互式发布
+          pnpm release --ci --increment=${{ needs.check-release.outputs.release-type }}
+
+  # 通知发布结果
+  notify:
+    name: Notify Release Result
+    runs-on: ubuntu-latest
+    needs: [check-release, release]
+    if: always() && needs.check-release.outputs.should-release == 'true'
+    steps:
+      - name: Notify success
+        if: needs.release.result == 'success'
+        run: |
+          echo "✅ Release completed successfully!"
+          echo "Release type: ${{ needs.check-release.outputs.release-type }}"
+
+      - name: Notify failure
+        if: needs.release.result == 'failure'
+        run: |
+          echo "❌ Release failed!"
+          echo "Please check the logs and try again."
+          exit 1
