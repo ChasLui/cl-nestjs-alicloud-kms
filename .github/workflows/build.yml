@@ -12,17 +12,12 @@ on:
     branches: ['**']
 
 jobs:
-  ci:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 15 # Prevent indefinite hanging
     # Skip if it's a release commit to avoid conflicts with release workflow
     if: >-
       ${{ !startsWith(github.event.head_commit.message, 'chore: release v') }}
-
-    strategy:
-      matrix:
-        node-version: [20, 22]
-      fail-fast: false # Don't cancel other jobs if one fails
 
     steps:
       - name: 📥 Checkout Repository
@@ -33,10 +28,10 @@ jobs:
         with:
           version: latest
 
-      - name: 🟢 Setup Node.js ${{ matrix.node-version }}
+      - name: 🟢 Setup Node.js 22 (Build)
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -80,30 +75,8 @@ jobs:
 
           echo "✅ All build outputs verified"
 
-      - name: 🧪 Test Module Imports (ESM & CJS)
-        timeout-minutes: 2
-        run: |
-          echo "Testing ESM imports..."
-          node --input-type=module -e "
-            import { KmsModule, KmsService } from './dist/index.mjs';
-            console.log('✅ ESM import successful:', typeof KmsModule, typeof KmsService);
-            if (typeof KmsModule !== 'function' || typeof KmsService !== 'function') {
-              throw new Error('Invalid exports detected');
-            }
-          "
-
-          echo "Testing CJS requires..."
-          node -e "
-            const { KmsModule, KmsService } = require('./dist/index.cjs');
-            console.log('✅ CJS require successful:', typeof KmsModule, typeof KmsService);
-            if (typeof KmsModule !== 'function' || typeof KmsService !== 'function') {
-              throw new Error('Invalid exports detected');
-            }
-          "
-
       - name: 📊 Upload Coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.node-version == 20 # Only upload once
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage/lcov.info
@@ -111,9 +84,74 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: false
 
-      - name: 📈 Upload Coverage to Coveralls
-        uses: coverallsapp/github-action@v2
-        if: matrix.node-version == 20 # Only upload once
+      - name: 📦 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./coverage/lcov.info
+          name: build-artifacts
+          path: |
+            dist/
+            package.json
+            pnpm-lock.yaml
+          retention-days: 1
+
+  # Compatibility test job - verify library works on Node.js 20
+  compatibility:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        node-version: [20]
+      fail-fast: false
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup pnpm Package Manager
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: 🟢 Setup Node.js ${{ matrix.node-version }} (Compatibility Test)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: .
+
+      - name: 📚 Install Runtime Dependencies Only
+        timeout-minutes: 3
+        run: |
+          echo "Installing production dependencies for Node.js ${{ matrix.node-version }} compatibility test..."
+          pnpm install --prod --no-frozen-lockfile
+
+      - name: 🧪 Test Module Imports (ESM & CJS) on Node.js ${{ matrix.node-version }}
+        timeout-minutes: 2
+        run: |
+          echo "Testing ESM imports on Node.js ${{ matrix.node-version }}..."
+          node --input-type=module -e "
+            import { KmsModule, KmsService } from './dist/index.mjs';
+            console.log('✅ ESM import successful on Node.js ${{ matrix.node-version }}:', typeof KmsModule, typeof KmsService);
+            if (typeof KmsModule !== 'function' || typeof KmsService !== 'function') {
+              throw new Error('Invalid exports detected');
+            }
+          "
+
+          echo "Testing CJS requires on Node.js ${{ matrix.node-version }}..."
+          node -e "
+            const { KmsModule, KmsService } = require('./dist/index.cjs');
+            console.log('✅ CJS require successful on Node.js ${{ matrix.node-version }}:', typeof KmsModule, typeof KmsService);
+            if (typeof KmsModule !== 'function' || typeof KmsService !== 'function') {
+              throw new Error('Invalid exports detected');
+            }
+          "
+
+          echo "✅ Node.js ${{ matrix.node-version }} compatibility verified"
