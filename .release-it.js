@@ -7,6 +7,7 @@ export default {
     push: true,
     pushTags: true,
     addUntrackedFiles: false,
+    commit: process.env.CI, // 只在CI环境中自动提交
   },
   github: {
     release: true,

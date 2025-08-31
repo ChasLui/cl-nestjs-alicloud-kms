@@ -53,6 +53,8 @@ jobs:
 
       - name: 📚 Install dependencies
         timeout-minutes: 5
+        env:
+          HUSKY: 0 # Disable Husky in CI
         run: |
           echo "Installing root dependencies..."
           pnpm install --no-frozen-lockfile
@@ -61,6 +63,8 @@ jobs:
 
       - name: 🔍 Quick Build Verification
         timeout-minutes: 5
+        env:
+          HUSKY: 0 # Disable Husky in CI
         run: |
           echo "Running quick build verification before release..."
           pnpm build
@@ -97,10 +101,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HUSKY: 0 # Disable Husky in CI
         run: |
           echo "Configuring git for release..."
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Ensure Husky is completely disabled
+          export HUSKY=0
+          export CI=true
 
           echo "Starting semantic release process..."
           echo "📊 Analyzing commits for version bump..."
