@@ -9,17 +9,18 @@ export default {
     addUntrackedFiles: false,
     commit: process.env.CI, // 只在CI环境中自动提交
   },
-  github: {
-    release: true,
-    releaseName: 'Release v${version}',
-    autoGenerate: true, // 自动生成release notes
-    preRelease: false,
-  },
   npm: {
     publish: true,
     access: 'public',
     publishPath: 'dist',
     ignoreVersion: false,
+    skipChecks: process.env.CI === 'true', // CI环境跳过一些检查
+  },
+  github: {
+    release: true,
+    releaseName: 'Release v${version}',
+    autoGenerate: true, // 自动生成release notes
+    preRelease: false,
   },
   plugins: {
     '@release-it/conventional-changelog': {

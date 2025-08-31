@@ -70,6 +70,30 @@ jobs:
           pnpm build
           echo "✅ Build verification successful"
 
+      - name: 🔄 Sync Package Version with Registry
+        id: sync-version
+        run: |
+          echo "Checking version synchronization..."
+
+          # Get current package.json version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current package.json version: $CURRENT_VERSION"
+
+          # Get latest published version from npm
+          PUBLISHED_VERSION=$(npm view cl-nestjs-alicloud-kms version 2>/dev/null || echo "0.0.0")
+          echo "Published npm version: $PUBLISHED_VERSION"
+
+          # Compare versions and sync if needed
+          if [ "$CURRENT_VERSION" != "$PUBLISHED_VERSION" ]; then
+            echo "🔄 Version mismatch detected, syncing package.json to published version..."
+            npm version $PUBLISHED_VERSION --no-git-tag-version
+            echo "✅ Package version synced to $PUBLISHED_VERSION"
+            echo "version_synced=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Package version is already in sync"
+            echo "version_synced=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: 🔍 Check for Releasable Changes
         id: check-changes
         run: |
@@ -113,6 +137,16 @@ jobs:
 
           echo "Starting semantic release process..."
           echo "📊 Analyzing commits for version bump..."
+
+          # Check if we need to handle version conflicts
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED_VERSION=$(npm view cl-nestjs-alicloud-kms version 2>/dev/null || echo "0.0.0")
+
+          if [ "$CURRENT_VERSION" = "$PUBLISHED_VERSION" ]; then
+            echo "ℹ️  Current version matches published version, release-it will auto-increment"
+          else
+            echo "⚠️  Version mismatch detected during release, but proceeding with release-it auto-increment"
+          fi
 
           # Run release-it with CI flag for automatic version determination
           pnpm release:ci --verbose
@@ -169,6 +203,32 @@ jobs:
           echo "- \`feat!: breaking change\` → **major** version bump (0.1.0 → 1.0.0)" >> $GITHUB_STEP_SUMMARY
           echo "- Any commit with \`BREAKING CHANGE:\` in body → **major** version bump" >> $GITHUB_STEP_SUMMARY
 
+      - name: 🔄 Handle Version Conflict Recovery
+        if: failure() && contains(github.event.head_commit.message, 'cannot publish over the previously published versions')
+        run: |
+          echo "🔄 Detected version conflict, attempting recovery..."
+
+          # Get the next version that should be published
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+
+          # Extract version parts and increment patch version
+          MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
+          MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
+          PATCH=$(echo $CURRENT_VERSION | cut -d. -f3)
+
+          # Increment patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+
+          echo "Attempting to bump to version: $NEW_VERSION"
+
+          # Update package.json with new version
+          npm version $NEW_VERSION --no-git-tag-version
+
+          # Retry release with new version
+          pnpm release:ci --verbose
+
       - name: ❌ Release Failure Notification
         if: failure()
         run: |
@@ -180,5 +240,6 @@ jobs:
           echo "- Check if all CI tests are passing" >> $GITHUB_STEP_SUMMARY
           echo "- Verify \`NPM_TOKEN\` secret is valid and has publish permissions" >> $GITHUB_STEP_SUMMARY
           echo "- Ensure no uncommitted changes exist" >> $GITHUB_STEP_SUMMARY
-          echo "- Check if the version already exists on npm" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version conflict**: The version may already exist on npm" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auto-recovery**: The workflow attempted to auto-increment version" >> $GITHUB_STEP_SUMMARY
           echo "- Verify conventional commit format is correct" >> $GITHUB_STEP_SUMMARY
