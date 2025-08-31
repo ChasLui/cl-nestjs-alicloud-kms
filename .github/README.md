@@ -1,6 +1,6 @@
 # GitHub Actions 工作流配置
 
-本项目配置了完整的 CI/CD 流水线，支持自动化测试、构建、发布和安全扫描。
+本项目配置了简化高效的 CI/CD 流水线，支持自动化测试、构建、发布和安全扫描。
 
 ## 工作流说明
 
@@ -10,11 +10,11 @@
 
 **功能**:
 
-- 代码质量检查 (ESLint + Prettier)
-- 多版本 Node.js 测试 (18, 20, 22)
-- 测试覆盖率报告
-- 构建验证
-- 依赖安全扫描
+- **多版本测试**: Node.js 18, 20, 22 并行测试
+- **代码质量**: ESLint 检查 + TypeScript 类型检查
+- **测试覆盖率**: 仅在 Node.js 20 上运行覆盖率检查
+- **构建验证**: 确保库可以正确构建
+- **PR 安全检查**: 依赖审查 (仅 PR 触发)
 
 ### 2. 发布工作流 (`release.yml`)
 
@@ -22,33 +22,24 @@
 
 **功能**:
 
-- 基于约定式提交自动判断是否需要发布
-- 自动确定版本升级类型 (major/minor/patch)
-- 运行完整测试套件
-- 自动生成 CHANGELOG
-- 创建 GitHub Release
-- 发布到 npm
+- **智能检测**: 自动检查提交是否需要发布
+- **质量保证**: 发布前运行完整测试套件
+- **自动发布**: 使用 release-it 自动发布到 npm 和 GitHub
 
-**版本升级规则**:
+**发布触发条件**:
 
-- `feat:` → minor 版本升级
-- `fix:`, `perf:`, `revert:` → patch 版本升级
-- `BREAKING CHANGE` 或 `!:` → major 版本升级
+- `feat:` → 新功能 (minor)
+- `fix:`, `perf:` → 修复/优化 (patch)
+- `BREAKING CHANGE` 或 `!:` → 破坏性变更 (major)
 
 ### 3. 安全工作流 (`security.yml`)
 
-**触发条件**:
-
-- 每周一自动运行
-- Push 到 `main` 分支
-- PR 到 `main` 分支
+**触发条件**: 每周一自动运行 + 手动触发
 
 **功能**:
 
-- 依赖安全审计
-- CodeQL 静态安全分析
-- 依赖许可证检查
-- 漏洞扫描
+- **依赖审计**: pnpm audit 检查已知漏洞
+- **静态分析**: CodeQL 安全代码扫描
 
 ## 环境变量配置
 
@@ -112,30 +103,17 @@ git commit -m "docs: 更新 README"
 
 ### 自动发布 (推荐)
 
-1. 确保遵循约定式提交格式
+1. 使用约定式提交格式提交代码
 2. Push 到 `main` 分支
-3. GitHub Actions 自动:
-   - 检测提交类型
-   - 运行测试和构建
-   - 确定版本号
-   - 生成 CHANGELOG
-   - 创建 Git 标签
-   - 发布到 npm
-   - 创建 GitHub Release
+3. GitHub Actions 自动处理发布流程
 
 ### 手动发布
 
-如需手动控制发布过程:
+本地发布命令:
 
 ```bash
-# 预览发布 (不实际发布)
-pnpm release:dry
-
-# 交互式发布
-pnpm release
-
-# CI 模式发布
-pnpm release:ci
+pnpm release:dry  # 预览发布
+pnpm release      # 交互式发布
 ```
 
 ## 分支策略
