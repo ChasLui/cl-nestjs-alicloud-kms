@@ -1,6 +1,6 @@
 {
   "name": "cl-nestjs-alicloud-kms",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "用于集成阿里云 KMS（密钥管理服务）以获取密钥和配置的 NestJS 模块",
   "repository": {
     "type": "git",
