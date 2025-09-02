@@ -158,7 +158,7 @@ describe('KmsService Robustness Tests', () => {
         ...mockConfig,
         client: {
           ...mockConfig.client,
-          endpoint: 'invalid-url',
+          endpoint: '://invalid',
         },
       };
 
