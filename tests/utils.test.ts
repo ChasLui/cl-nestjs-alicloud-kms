@@ -457,16 +457,23 @@ describe('工具函数', () => {
   });
 
   describe('validateEndpoint', () => {
-    it('should validate correct endpoints', () => {
+    it('should validate correct endpoints with protocol', () => {
       expect(() => validateEndpoint('https://kms.cn-hangzhou.aliyuncs.com')).not.toThrow();
       expect(() => validateEndpoint('http://localhost:8080')).not.toThrow();
+    });
+
+    it('should validate correct endpoints without protocol (auto-prepend https://)', () => {
+      expect(() => validateEndpoint('kms.cn-beijing.aliyuncs.com')).not.toThrow();
+      expect(() => validateEndpoint('kms.cn-hangzhou.aliyuncs.com')).not.toThrow();
+      expect(() => validateEndpoint('localhost:8080')).not.toThrow();
+      expect(() => validateEndpoint('example.com')).not.toThrow();
     });
 
     it('should throw for invalid endpoints', () => {
       expect(() => validateEndpoint('')).toThrow('Endpoint must be a non-empty string');
       expect(() => validateEndpoint('   ')).toThrow('Endpoint cannot be empty');
       expect(() => validateEndpoint('ftp://invalid.com')).toThrow('Endpoint must use HTTP or HTTPS protocol');
-      expect(() => validateEndpoint('not-a-url')).toThrow('Invalid endpoint URL');
+      expect(() => validateEndpoint('://invalid')).toThrow('Invalid endpoint URL');
     });
 
     it('should throw for non-string inputs', () => {

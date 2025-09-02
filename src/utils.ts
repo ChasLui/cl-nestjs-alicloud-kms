@@ -116,6 +116,7 @@ export function validateRegionId(regionId: string): void {
 
 /**
  * 验证端点 URL
+ * 支持带协议和不带协议的端点，不带协议时默认使用 https://
  */
 export function validateEndpoint(endpoint: string): void {
   if (!endpoint || typeof endpoint !== 'string') {
@@ -128,7 +129,13 @@ export function validateEndpoint(endpoint: string): void {
   }
 
   try {
-    const url = new URL(trimmed);
+    // 如果没有协议，默认添加 https://
+    let urlToValidate = trimmed;
+    if (!trimmed.includes('://')) {
+      urlToValidate = `https://${trimmed}`;
+    }
+
+    const url = new URL(urlToValidate);
     if (!['http:', 'https:'].includes(url.protocol)) {
       throw new Error('Endpoint must use HTTP or HTTPS protocol');
     }
