@@ -56,7 +56,6 @@ const initKmsModule = async () => {
 };
 import {
   KmsModuleConfig,
-  KmsSecretData,
   LoggerInterface,
   SecretConfig,
   SecretConfigMapping,
@@ -321,9 +320,9 @@ export class KmsService {
   /**
    * 获取密钥并解析为 JSON 对象
    * @param secretName 密钥名称
-   * @returns 解析后的 JSON 对象
+   * @returns 解析后的 JSON 对象（任意类型）
    */
-  async getSecretValueAsJson<T = KmsSecretData>(secretName: string): Promise<T> {
+  async getSecretValueAsJson(secretName: string): Promise<unknown> {
     const secretData = await this.getSecretValue(secretName);
 
     if (!secretData || secretData.trim().length === 0) {
@@ -331,14 +330,7 @@ export class KmsService {
     }
 
     try {
-      const parsed = JSON.parse(secretData);
-
-      // 验证解析结果是否为对象
-      if (typeof parsed !== 'object' || parsed === null) {
-        throw new Error(`Secret ${secretName} does not contain a valid JSON object`);
-      }
-
-      return parsed;
+      return JSON.parse(secretData);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       this.logger.error(`无法将密钥 ${secretName} 解析为 JSON:`, errorMessage);
@@ -354,13 +346,13 @@ export class KmsService {
 
   /**
    * 获取默认密钥并解析为 JSON 对象
-   * @returns 解析后的 JSON 对象
+   * @returns 解析后的 JSON 对象（任意类型）
    */
-  async getDefaultSecretValueAsJson<T = KmsSecretData>(): Promise<T> {
+  async getDefaultSecretValueAsJson(): Promise<unknown> {
     if (!this.config.defaultSecretName) {
       throw new Error('Default secret name is not configured');
     }
-    return this.getSecretValueAsJson<T>(this.config.defaultSecretName);
+    return this.getSecretValueAsJson(this.config.defaultSecretName);
   }
 
   /**

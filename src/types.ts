@@ -1,5 +1,5 @@
 import { Provider } from '@nestjs/common';
-import type { Simplify, RequireAtLeastOne, SetRequired, JsonValue, Merge, PartialDeep, RequiredDeep } from 'type-fest';
+import type { Simplify, RequireAtLeastOne, SetRequired, Merge, PartialDeep, RequiredDeep } from 'type-fest';
 
 /**
  * 日志级别类型
@@ -149,16 +149,14 @@ export interface KmsModuleOptions {
 }
 
 /**
- * 从 KMS 获取的密钥数据接口 - 使用 JsonValue 确保类型安全
+ * 从 KMS 获取的密钥数据类型 - 简单的 JSON 对象，不预设结构
  */
-export interface KmsSecretData {
-  readonly [key: string]: JsonValue;
-}
+export type KmsSecretData = unknown;
 
 /**
- * 强类型的密钥数据
+ * 强类型的密钥数据（已简化为通用类型）
  */
-export type TypedKmsSecretData<T extends Record<string, JsonValue>> = Simplify<T>;
+export type TypedKmsSecretData<T = unknown> = T;
 
 /**
  * 密钥名称类型
@@ -273,9 +271,9 @@ export type ExtendedKmsModuleConfig = Merge<
 >;
 
 /**
- * 类型安全的密钥映射
+ * 简化的密钥映射
  */
-export type SecretMapping<T extends Record<string, JsonValue>> = Simplify<{
+export type SecretMapping<T = Record<string, unknown>> = Simplify<{
   readonly [K in keyof T]: {
     readonly secretName: string;
     readonly defaultValue?: T[K];
@@ -285,11 +283,9 @@ export type SecretMapping<T extends Record<string, JsonValue>> = Simplify<{
 }>;
 
 /**
- * 密钥值提取器类型
+ * 简化的密钥值提取器类型
  */
-export type SecretExtractor<T extends Record<string, JsonValue>> = (
-  secrets: Record<string, string>,
-) => Promise<TypedKmsSecretData<T>> | TypedKmsSecretData<T>;
+export type SecretExtractor<T = unknown> = (secrets: Record<string, string>) => Promise<T> | T;
 
 /**
  * 密钥配置项

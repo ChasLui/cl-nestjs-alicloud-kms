@@ -172,8 +172,11 @@ export class AppConfigService {
   constructor(private readonly kmsService: KmsService) {}
 
   async getAppConfig() {
-    // 获取远程配置
-    const remoteConfig = await this.kmsService.getSecretValueAsJson('app-config');
+    // 获取远程配置 - 返回 unknown 类型，需要类型断言
+    const remoteConfig = await this.kmsService.getSecretValueAsJson('app-config-1');
+
+    // 类型断言为配置对象
+    const config = remoteConfig as Record<string, string>;
 
     // 本地默认配置
     const localDefaults = {
@@ -182,7 +185,7 @@ export class AppConfigService {
     };
 
     // 合并配置（远程配置优先）
-    return mergeConfig(localDefaults, remoteConfig);
+    return mergeConfig(localDefaults, config);
   }
 
   async getDatabasePassword() {
@@ -275,17 +278,17 @@ interface KmsModuleAsyncOptions {
 
 获取指定密钥的字符串值。支持自动重试、输入验证和缓存控制。
 
-#### `getSecretValueAsJson<T>(secretName: string): Promise<T>`
+#### `getSecretValueAsJson(secretName: string): Promise<unknown>`
 
-获取密钥并解析为 JSON 对象。支持空值检查和详细错误信息。
+获取密钥并解析为 JSON 数据。支持任何有效的 JSON 格式（对象、数组、字符串、数字、布尔值、null）。支持空值检查和详细错误信息。
 
 #### `getDefaultSecretValue(): Promise<string>`
 
 获取默认密钥的值。
 
-#### `getDefaultSecretValueAsJson<T>(): Promise<T>`
+#### `getDefaultSecretValueAsJson(): Promise<unknown>`
 
-获取默认密钥并解析为 JSON 对象。
+获取默认密钥并解析为 JSON 数据。支持任何有效的 JSON 格式。
 
 #### `getMultipleSecrets(secretNames: string[]): Promise<Record<string, string>>`
 
@@ -466,11 +469,19 @@ export class ConfigService {
   constructor(private readonly kmsService: KmsService) {}
 
   async getDatabaseConfig() {
-    // 首次调用会从 KMS 获取并缓存
+    // 首次调用会从 KMS 获取并缓存 - 返回 unknown 类型
     const config = await this.kmsService.getSecretValueAsJson('app/database/config');
 
+    // 类型断言为数据库配置
+    const dbConfig = config as {
+      host: string;
+      port: number;
+      username: string;
+      password: string;
+    };
+
     // 后续调用会从缓存返回（如果未过期）
-    return config;
+    return dbConfig;
   }
 
   async refreshAllConfigs() {
@@ -490,6 +501,91 @@ export class ConfigService {
     };
   }
 }
+```
+
+### JSON 数据类型处理示例 🆕
+
+重构后的 KMS 服务支持任何有效的 JSON 格式，以下是处理不同类型数据的示例：
+
+```typescript
+@Injectable()
+export class JsonHandlingService {
+  constructor(private readonly kmsService: KmsService) {}
+
+  // 处理对象类型的 JSON
+  async getObjectConfig() {
+    const data = await this.kmsService.getSecretValueAsJson('app-config');
+
+    // 类型检查和断言
+    if (typeof data === 'object' && data !== null) {
+      const config = data as Record<string, unknown>;
+      return {
+        database: config['database.host'] as string,
+        port: Number(config['database.port']),
+        redis: config['redis.host'] as string,
+      };
+    }
+    throw new Error('Expected object configuration');
+  }
+
+  // 处理数组类型的 JSON
+  async getArrayConfig() {
+    const data = await this.kmsService.getSecretValueAsJson('allowed-domains');
+
+    if (Array.isArray(data)) {
+      return data as string[];
+    }
+    throw new Error('Expected array of domains');
+  }
+
+  // 处理字符串类型的 JSON
+  async getStringConfig() {
+    const data = await this.kmsService.getSecretValueAsJson('api-endpoint');
+
+    if (typeof data === 'string') {
+      return data;
+    }
+    throw new Error('Expected string endpoint');
+  }
+
+  // 处理数字类型的 JSON
+  async getNumberConfig() {
+    const data = await this.kmsService.getSecretValueAsJson('max-connections');
+
+    if (typeof data === 'number') {
+      return data;
+    }
+    throw new Error('Expected number configuration');
+  }
+
+  // 处理布尔类型的 JSON
+  async getBooleanConfig() {
+    const data = await this.kmsService.getSecretValueAsJson('debug-mode');
+
+    if (typeof data === 'boolean') {
+      return data;
+    }
+    throw new Error('Expected boolean configuration');
+  }
+
+  // 通用类型处理函数
+  async getTypedConfig<T>(secretName: string, validator: (data: unknown) => data is T): Promise<T> {
+    const data = await this.kmsService.getSecretValueAsJson(secretName);
+
+    if (validator(data)) {
+      return data;
+    }
+    throw new Error(`Invalid data type for secret: ${secretName}`);
+  }
+}
+
+// 类型守卫示例
+function isAppConfig(data: unknown): data is AppConfig {
+  return typeof data === 'object' && data !== null && 'host' in data && 'port' in data;
+}
+
+// 使用类型守卫
+const config = await jsonService.getTypedConfig('app-config', isAppConfig);
 ```
 
 ### 工具函数
@@ -611,8 +707,10 @@ export class DatabaseConfigService {
 
   async getDatabaseConfig(): Promise<DatabaseConfig> {
     const remoteConfig = await this.kmsService.getSecretValueAsJson('db-config');
+    // 类型断言为数据库配置对象
+    const config = remoteConfig as Partial<DatabaseConfig>;
     const localDefaults = { port: '5432', ssl: 'true' };
-    return mergeConfig(localDefaults, remoteConfig);
+    return mergeConfig(localDefaults, config);
   }
 }
 ```

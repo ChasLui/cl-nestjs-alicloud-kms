@@ -1,5 +1,5 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { KMS_CONFIG_TOKEN, type KmsModuleConfig, type KmsSecretData, getErrorMessage } from '@/index';
+import { KMS_CONFIG_TOKEN, type KmsModuleConfig, getErrorMessage } from '@/index';
 
 /**
  * 模拟 KMS 客户端 - 仅用于演示目的
@@ -106,11 +106,11 @@ export class DemoKmsService {
   }
 
   /**
-   * 获取密钥并解析为 JSON 对象
+   * 获取密钥并解析为 JSON 数据
    * @param secretName 密钥名称
-   * @returns 解析后的 JSON 对象
+   * @returns 解析后的 JSON 数据（任意类型）
    */
-  async getSecretValueAsJson<T = KmsSecretData>(secretName: string): Promise<T> {
+  async getSecretValueAsJson(secretName: string): Promise<unknown> {
     const secretData = await this.getSecretValue(secretName);
 
     try {
@@ -122,14 +122,14 @@ export class DemoKmsService {
   }
 
   /**
-   * 获取默认密钥并解析为 JSON 对象
-   * @returns 解析后的 JSON 对象
+   * 获取默认密钥并解析为 JSON 数据
+   * @returns 解析后的 JSON 数据（任意类型）
    */
-  async getDefaultSecretValueAsJson<T = KmsSecretData>(): Promise<T> {
+  async getDefaultSecretValueAsJson(): Promise<unknown> {
     if (!this.config.defaultSecretName) {
       throw new Error('Default secret name is not configured');
     }
-    return this.getSecretValueAsJson<T>(this.config.defaultSecretName);
+    return this.getSecretValueAsJson(this.config.defaultSecretName);
   }
 
   /**

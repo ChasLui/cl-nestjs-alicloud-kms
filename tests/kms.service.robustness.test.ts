@@ -273,20 +273,18 @@ describe('KmsService Robustness Tests', () => {
       );
     });
 
-    it('should validate JSON object type', async () => {
+    it('should accept any valid JSON type including strings', async () => {
       mockKmsClient.getSecretValue.mockResolvedValue({ body: { secretData: '"just a string"' } });
 
-      await expect(service.getSecretValueAsJson('test-secret')).rejects.toThrow(
-        'Secret test-secret does not contain a valid JSON object',
-      );
+      const result = await service.getSecretValueAsJson('test-secret');
+      expect(result).toBe('just a string');
     });
 
-    it('should handle JSON null value', async () => {
+    it('should accept JSON null value', async () => {
       mockKmsClient.getSecretValue.mockResolvedValue({ body: { secretData: 'null' } });
 
-      await expect(service.getSecretValueAsJson('test-secret')).rejects.toThrow(
-        'Secret test-secret does not contain a valid JSON object',
-      );
+      const result = await service.getSecretValueAsJson('test-secret');
+      expect(result).toBe(null);
     });
 
     it('should provide detailed JSON parsing error messages', async () => {

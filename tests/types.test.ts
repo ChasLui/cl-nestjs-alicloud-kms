@@ -121,7 +121,7 @@ describe('类型模块', () => {
       expect(typeof logger.verbose).toBe('function');
     });
 
-    it('should support KmsSecretData as Record type', () => {
+    it('should support KmsSecretData as unknown type', () => {
       const secretData: KmsSecretData = {
         'database.host': 'localhost',
         'database.port': '5432',
@@ -131,8 +131,10 @@ describe('类型模块', () => {
         },
       };
 
-      expect(secretData['database.host']).toBe('localhost');
-      expect(secretData.nested.value).toBe('test');
+      // Since KmsSecretData is now unknown, we need to cast it to access properties
+      const typedData = secretData as Record<string, unknown>;
+      expect((typedData as { [key: string]: string })['database.host']).toBe('localhost');
+      expect((typedData as { nested: { value: string } }).nested.value).toBe('test');
     });
 
     it('should support KmsModuleAsyncOptions with useFactory', () => {
