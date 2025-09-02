@@ -10,18 +10,36 @@ const initKmsModule = async () => {
     try {
       // 尝试 ESM 导入
       const kmsModule = await import('@alicloud/kms20160120');
-      KmsClient = kmsModule.default;
-      GetSecretValueRequest = kmsModule.GetSecretValueRequest;
-    } catch {
+
+      // 尝试多种导入模式来找到正确的 Client 构造函数
+      KmsClient = kmsModule.default?.Client || kmsModule.Client || kmsModule.default || kmsModule;
+      GetSecretValueRequest = kmsModule.GetSecretValueRequest || kmsModule.default?.GetSecretValueRequest;
+
+      // 验证 KmsClient 是否为构造函数
+      if (typeof KmsClient !== 'function') {
+        throw new Error(
+          `KmsClient is not a constructor. Type: ${typeof KmsClient}, Available keys: ${Object.keys(kmsModule)}`,
+        );
+      }
+    } catch (error) {
       // 如果 ESM 导入失败，尝试使用 createRequire (仅在支持时)
       if (typeof import.meta !== 'undefined' && import.meta.url) {
         const { createRequire } = await import('module');
         const require = createRequire(import.meta.url);
         const kmsModule = require('@alicloud/kms20160120');
-        KmsClient = kmsModule.default;
-        GetSecretValueRequest = kmsModule.GetSecretValueRequest;
+
+        // 尝试多种导入模式
+        KmsClient = kmsModule.default?.Client || kmsModule.Client || kmsModule.default || kmsModule;
+        GetSecretValueRequest = kmsModule.GetSecretValueRequest || kmsModule.default?.GetSecretValueRequest;
+
+        // 验证 KmsClient 是否为构造函数
+        if (typeof KmsClient !== 'function') {
+          throw new Error(
+            `KmsClient is not a constructor. Type: ${typeof KmsClient}, Available keys: ${Object.keys(kmsModule)}`,
+          );
+        }
       } else {
-        throw new Error('Unable to import @alicloud/kms20160120 in this environment');
+        throw new Error(`Unable to import @alicloud/kms20160120 in this environment. Original error: ${error.message}`);
       }
     }
   }
