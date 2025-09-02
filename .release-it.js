@@ -1,13 +1,13 @@
 export default {
   git: {
-    requireCleanWorkingDir: false, // CI环境可能有构建产物
+    requireCleanWorkingDir: process.env.CI !== 'true', // 在CI环境中允许不干净的工作目录
     requireBranch: ['main', 'master'],
     commitMessage: 'chore: release v${version}',
     tagName: 'v${version}',
     push: true,
     pushTags: true,
     addUntrackedFiles: false,
-    commit: process.env.CI, // 只在CI环境中自动提交
+    commit: process.env.CI === 'true', // 只在CI环境中自动提交
   },
   npm: {
     publish: true,

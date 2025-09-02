@@ -87,7 +87,16 @@ jobs:
           if [ "$CURRENT_VERSION" != "$PUBLISHED_VERSION" ]; then
             echo "🔄 Version mismatch detected, syncing package.json to published version..."
             npm version $PUBLISHED_VERSION --no-git-tag-version
-            echo "✅ Package version synced to $PUBLISHED_VERSION"
+            
+            # Configure git for the sync commit
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            
+            # Commit the version sync changes
+            git add package.json
+            git commit -m "chore: sync package version to published version $PUBLISHED_VERSION"
+            
+            echo "✅ Package version synced to $PUBLISHED_VERSION and committed"
             echo "version_synced=true" >> $GITHUB_OUTPUT
           else
             echo "✅ Package version is already in sync"
@@ -137,6 +146,14 @@ jobs:
 
           echo "Starting semantic release process..."
           echo "📊 Analyzing commits for version bump..."
+
+          # Ensure we have a clean build
+          echo "🔨 Ensuring clean build for release..."
+          pnpm build
+
+          # Check git status before release
+          echo "📋 Current git status:"
+          git status --porcelain || true
 
           # Check if we need to handle version conflicts
           CURRENT_VERSION=$(node -p "require('./package.json').version")
