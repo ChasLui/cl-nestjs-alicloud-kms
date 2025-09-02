@@ -1,5 +1,32 @@
 import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
-import KmsClient, { GetSecretValueRequest } from '@alicloud/kms20160120';
+
+// 动态导入 KMS SDK 以解决 ESM/CommonJS 兼容性问题
+let KmsClient: new (config: unknown) => unknown;
+let GetSecretValueRequest: new (params: unknown) => unknown;
+
+// 使用动态导入来处理 CommonJS 模块
+const initKmsModule = async () => {
+  if (!KmsClient) {
+    try {
+      // 尝试 ESM 导入
+      const kmsModule = await import('@alicloud/kms20160120');
+      KmsClient = kmsModule.default;
+      GetSecretValueRequest = kmsModule.GetSecretValueRequest;
+    } catch {
+      // 如果 ESM 导入失败，尝试使用 createRequire (仅在支持时)
+      if (typeof import.meta !== 'undefined' && import.meta.url) {
+        const { createRequire } = await import('module');
+        const require = createRequire(import.meta.url);
+        const kmsModule = require('@alicloud/kms20160120');
+        KmsClient = kmsModule.default;
+        GetSecretValueRequest = kmsModule.GetSecretValueRequest;
+      } else {
+        throw new Error('Unable to import @alicloud/kms20160120 in this environment');
+      }
+    }
+  }
+  return { KmsClient, GetSecretValueRequest };
+};
 import {
   KmsModuleConfig,
   KmsSecretData,
@@ -33,7 +60,8 @@ export const KMS_CACHE_TOKEN = 'KMS_CACHE_TOKEN';
 @Injectable()
 export class KmsService {
   private readonly logger: LoggerInterface;
-  private readonly kmsClient: KmsClient;
+  private kmsClient: unknown;
+  private initPromise: Promise<void>;
 
   constructor(
     @Inject(KMS_CONFIG_TOKEN)
@@ -48,9 +76,21 @@ export class KmsService {
     // 优先使用注入的 logger，其次使用配置中的 logger，最后使用默认的 NestJS Logger
     this.logger = this.injectedLogger || this.config.logger || new Logger(KmsService.name);
 
+    // 异步初始化 KMS 客户端
+    this.initPromise = this.initializeKmsClient();
+  }
+
+  /**
+   * 异步初始化 KMS 客户端
+   * @private
+   */
+  private async initializeKmsClient(): Promise<void> {
     try {
       // 验证配置
       this.validateConfiguration();
+
+      // 初始化 KMS 模块
+      const { KmsClient: ClientClass } = await initKmsModule();
 
       const clientConfig = {
         accessKeyId: this.config.client.accessKeyId,
@@ -65,7 +105,7 @@ export class KmsService {
         }),
       };
 
-      this.kmsClient = new KmsClient(clientConfig);
+      this.kmsClient = new ClientClass(clientConfig);
 
       if (this.config.enableLogging) {
         this.logger.log('KMS Service initialized successfully', sanitizeForLogging(clientConfig));
@@ -73,6 +113,16 @@ export class KmsService {
     } catch (error) {
       this.logger.error('Failed to initialize KMS Service:', getErrorMessage(error));
       throw error;
+    }
+  }
+
+  /**
+   * 确保 KMS 客户端已初始化
+   * @private
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.kmsClient) {
+      await this.initPromise;
     }
   }
 
@@ -111,6 +161,9 @@ export class KmsService {
    * @returns 密钥数据
    */
   async getSecretValue(secretName: string, skipCache = false): Promise<string> {
+    // 确保 KMS 客户端已初始化
+    await this.ensureInitialized();
+
     // 验证输入参数
     validateSecretName(secretName);
 
@@ -130,7 +183,9 @@ export class KmsService {
         this.logger.log(`Fetching secret from KMS: ${secretName}`);
       }
 
-      const request = new GetSecretValueRequest({
+      // 动态获取 GetSecretValueRequest
+      const { GetSecretValueRequest: RequestClass } = await initKmsModule();
+      const request = new RequestClass({
         secretName,
       });
 
@@ -508,6 +563,9 @@ export class KmsService {
    */
   async checkConnection(): Promise<boolean> {
     try {
+      // 确保 KMS 客户端已初始化
+      await this.ensureInitialized();
+
       if (this.config.defaultSecretName) {
         await this.getSecretValue(this.config.defaultSecretName);
       } else {
@@ -524,7 +582,8 @@ export class KmsService {
    * 获取 KMS 客户端实例（高级用法）
    * @returns KMS 客户端实例
    */
-  getKmsClient(): KmsClient {
+  async getKmsClient(): Promise<unknown> {
+    await this.ensureInitialized();
     return this.kmsClient;
   }
 
