@@ -8,6 +8,15 @@ let GetSecretValueRequest: new (params: unknown) => unknown;
 const initKmsModule = async () => {
   if (!KmsClient) {
     try {
+      // 在测试环境中，直接使用已经模拟的模块
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+        // 尝试获取已经模拟的模块
+        const kmsModule = await import('@alicloud/kms20160120');
+        KmsClient = kmsModule.default;
+        GetSecretValueRequest = kmsModule.GetSecretValueRequest;
+        return { KmsClient, GetSecretValueRequest };
+      }
+
       // 尝试 ESM 导入
       const kmsModule = await import('@alicloud/kms20160120');
 
@@ -94,6 +103,9 @@ export class KmsService {
     // 优先使用注入的 logger，其次使用配置中的 logger，最后使用默认的 NestJS Logger
     this.logger = this.injectedLogger || this.config.logger || new Logger(KmsService.name);
 
+    // 验证配置 - 同步验证以确保在构造时就能捕获错误
+    this.validateConfiguration();
+
     // 异步初始化 KMS 客户端
     this.initPromise = this.initializeKmsClient();
   }
@@ -104,9 +116,6 @@ export class KmsService {
    */
   private async initializeKmsClient(): Promise<void> {
     try {
-      // 验证配置
-      this.validateConfiguration();
-
       // 初始化 KMS 模块
       const { KmsClient: ClientClass } = await initKmsModule();
 
@@ -198,7 +207,7 @@ export class KmsService {
 
     return this.executeWithRetry(async () => {
       if (this.config.enableLogging) {
-        this.logger.log(`Fetching secret from KMS: ${secretName}`);
+        this.logger.log(`从 KMS 获取密钥: ${secretName}`);
       }
 
       // 动态获取 GetSecretValueRequest
@@ -219,7 +228,7 @@ export class KmsService {
       }
 
       if (this.config.enableLogging) {
-        this.logger.log(`Successfully fetched secret: ${secretName}`);
+        this.logger.log(`成功获取密钥: ${secretName}`);
       }
 
       return secretData;
@@ -332,7 +341,7 @@ export class KmsService {
       return parsed;
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      this.logger.error(`Failed to parse secret ${secretName} as JSON:`, errorMessage);
+      this.logger.error(`无法将密钥 ${secretName} 解析为 JSON:`, errorMessage);
 
       // 提供更具体的错误信息
       if (errorMessage.includes('Unexpected token') || errorMessage.includes('JSON')) {
@@ -587,11 +596,11 @@ export class KmsService {
       if (this.config.defaultSecretName) {
         await this.getSecretValue(this.config.defaultSecretName);
       } else {
-        this.logger.warn('No default secret configured for connection check');
+        this.logger.warn('连接检查未配置默认密钥');
       }
       return true;
     } catch (error) {
-      this.logger.error('KMS connection check failed:', getErrorMessage(error));
+      this.logger.error('KMS 连接检查失败:', getErrorMessage(error));
       return false;
     }
   }

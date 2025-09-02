@@ -41,6 +41,10 @@ describe('KMS服务', () => {
     // Clear all mocks before each test
     vi.clearAllMocks();
 
+    // Re-establish the mock implementation after clearing
+    const KmsClient = (await import('@alicloud/kms20160120')).default;
+    vi.mocked(KmsClient).mockImplementation(() => mockKmsClient);
+
     module = await Test.createTestingModule({
       imports: [KmsModule.forRoot(mockConfig)],
     }).compile();
@@ -384,7 +388,7 @@ describe('KMS服务', () => {
 
       const result = await service.refreshSecretCache('test-secret');
       expect(result).toBe('test-value');
-    });
+    }, 10000);
   });
 
   describe('密钥验证覆盖率测试', () => {

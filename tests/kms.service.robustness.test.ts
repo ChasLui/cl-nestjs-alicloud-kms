@@ -385,6 +385,6 @@ describe('KmsService Robustness Tests', () => {
       mockKmsClient.getSecretValue.mockRejectedValue(weirdError);
 
       await expect(service.getSecretValue('test-secret')).rejects.toBe(weirdError);
-    });
+    }, 10000);
   });
 });

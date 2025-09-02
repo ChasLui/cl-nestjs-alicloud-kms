@@ -11,6 +11,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // 设置测试环境变量
+    env: {
+      NODE_ENV: 'test',
+      VITEST: 'true',
+    },
     // 排除 playground 目录，不进行测试
     exclude: ['playground/**', 'node_modules/**', 'dist/**', 'coverage/**', '.git/**'],
     // 测试覆盖率配置，排除 playground 目录

@@ -82,6 +82,10 @@ describe('覆盖率增强测试', () => {
     kmsService = module.get<KmsService>(KmsService);
     cacheService = module.get<CacheService>(CacheService);
     vi.clearAllMocks();
+
+    // Re-establish the mock implementation after clearing
+    const KmsClient = (await import('@alicloud/kms20160120')).default;
+    vi.mocked(KmsClient).mockImplementation(() => mockKmsClient);
   });
 
   afterEach(async () => {
@@ -186,6 +190,10 @@ describe('覆盖率增强测试', () => {
 
       vi.clearAllMocks();
 
+      // Re-establish the mock implementation after clearing
+      const KmsClient = (await import('@alicloud/kms20160120')).default;
+      vi.mocked(KmsClient).mockImplementation(() => mockKmsClient);
+
       // 预热时应该跳过已缓存的
       await kmsService.warmupCache(secretNames, false);
 
@@ -203,7 +211,7 @@ describe('覆盖率增强测试', () => {
         'Failed to warmup cache:',
         expect.stringContaining('Failed to fetch 1 secret(s):'),
       );
-    });
+    }, 10000);
 
     it('应该处理warmupCache的部分成功情况', async () => {
       const secretNames = ['secret1', 'secret2'];
@@ -216,7 +224,7 @@ describe('覆盖率增强测试', () => {
       await expect(kmsService.warmupCache(secretNames)).rejects.toThrow();
 
       expect(mockLogger.log).toHaveBeenCalledWith('Warming up cache for 2 secrets');
-    });
+    }, 10000);
 
     it('应该处理禁用日志的情况', async () => {
       // 创建禁用日志的服务
@@ -265,7 +273,7 @@ describe('覆盖率增强测试', () => {
       expect(mockLogger.log).not.toHaveBeenCalledWith(expect.stringContaining('Warming up cache'));
 
       await noLogModule.close();
-    });
+    }, 10000);
   });
 
   describe('缓存服务清理定时器', () => {

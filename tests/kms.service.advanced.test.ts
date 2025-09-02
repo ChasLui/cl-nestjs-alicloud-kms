@@ -9,7 +9,7 @@ import {
   type LoggerInterface,
 } from '../src/index';
 
-// Mock the entire KMS client module
+// 模拟整个 KMS 客户端模块
 vi.mock('@alicloud/kms20160120', () => {
   return {
     default: vi.fn().mockImplementation(() => ({
@@ -19,7 +19,7 @@ vi.mock('@alicloud/kms20160120', () => {
   };
 });
 
-describe('KmsService Advanced API Tests', () => {
+describe('KmsService 高级 API 测试', () => {
   let service: KmsService;
   let module: TestingModule;
   let mockKmsClient: {
@@ -39,10 +39,10 @@ describe('KmsService Advanced API Tests', () => {
   };
 
   beforeEach(async () => {
-    // Clear all mocks
+    // 清除所有模拟
     vi.clearAllMocks();
 
-    // Create mock logger
+    // 创建模拟日志记录器
     mockLogger = {
       log: vi.fn(),
       error: vi.fn(),
@@ -51,13 +51,14 @@ describe('KmsService Advanced API Tests', () => {
       verbose: vi.fn(),
     };
 
-    // Create mock KMS client
+    // 创建模拟 KMS 客户端
     mockKmsClient = {
       getSecretValue: vi.fn(),
     };
 
-    // Mock the KmsClient constructor
-    (KmsClient as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => mockKmsClient);
+    // Re-establish the mock implementation after clearing
+    const KmsClientMock = (await import('@alicloud/kms20160120')).default;
+    vi.mocked(KmsClientMock).mockImplementation(() => mockKmsClient);
 
     module = await Test.createTestingModule({
       providers: [
@@ -82,7 +83,7 @@ describe('KmsService Advanced API Tests', () => {
   });
 
   describe('getSecretValue', () => {
-    it('should successfully fetch secret value', async () => {
+    it('应该成功获取密钥值', async () => {
       const mockSecretData = 'test-secret-value';
       mockKmsClient.getSecretValue.mockResolvedValue({
         body: {
@@ -96,11 +97,11 @@ describe('KmsService Advanced API Tests', () => {
       expect(mockKmsClient.getSecretValue).toHaveBeenCalledWith({
         secretName: 'test-secret',
       });
-      expect(mockLogger.log).toHaveBeenCalledWith('Fetching secret from KMS: test-secret');
-      expect(mockLogger.log).toHaveBeenCalledWith('Successfully fetched secret: test-secret');
+      expect(mockLogger.log).toHaveBeenCalledWith('从 KMS 获取密钥: test-secret');
+      expect(mockLogger.log).toHaveBeenCalledWith('成功获取密钥: test-secret');
     });
 
-    it('should handle missing secretData in response', async () => {
+    it('应该处理响应中缺少 secretData 的情况', async () => {
       mockKmsClient.getSecretValue.mockResolvedValue({
         body: {},
       });
@@ -113,7 +114,7 @@ describe('KmsService Advanced API Tests', () => {
       });
     });
 
-    it('should handle response without body', async () => {
+    it('应该处理没有 body 的响应', async () => {
       mockKmsClient.getSecretValue.mockResolvedValue({});
 
       const result = await service.getSecretValue('test-secret');
@@ -124,7 +125,7 @@ describe('KmsService Advanced API Tests', () => {
       });
     });
 
-    it('should handle KMS API errors', async () => {
+    it('应该处理 KMS API 错误', async () => {
       const mockError = new Error('KMS API Error');
       mockKmsClient.getSecretValue.mockRejectedValue(mockError);
 
@@ -135,8 +136,8 @@ describe('KmsService Advanced API Tests', () => {
       );
     });
 
-    it('should work without logging when logging is disabled', async () => {
-      // Create separate mock logger for this test
+    it('当禁用日志记录时应该在没有日志记录的情况下工作', async () => {
+      // 为此测试创建单独的模拟日志记录器
       const separateLogger = {
         log: vi.fn(),
         error: vi.fn(),
@@ -145,7 +146,7 @@ describe('KmsService Advanced API Tests', () => {
         verbose: vi.fn(),
       };
 
-      // Create service with logging disabled
+      // 创建禁用日志记录的服务
       const configWithoutLogging: KmsModuleConfig = {
         ...mockConfig,
         enableLogging: false,
@@ -173,13 +174,13 @@ describe('KmsService Advanced API Tests', () => {
         },
       });
 
-      // Clear any calls made during initialization
+      // 清除初始化期间进行的任何调用
       separateLogger.log.mockClear();
 
       const result = await testService.getSecretValue('test-secret');
 
       expect(result).toBe(mockSecretData);
-      // Logger should not be called when logging is disabled for API calls
+      // 当禁用日志记录时，日志记录器不应该被调用用于 API 调用
       expect(separateLogger.log).not.toHaveBeenCalled();
 
       await testModule.close();
@@ -187,7 +188,7 @@ describe('KmsService Advanced API Tests', () => {
   });
 
   describe('getDefaultSecretValue', () => {
-    it('should successfully fetch default secret value', async () => {
+    it('应该成功获取默认密钥值', async () => {
       const mockSecretData = 'default-secret-value';
       mockKmsClient.getSecretValue.mockResolvedValue({
         body: {
@@ -199,13 +200,13 @@ describe('KmsService Advanced API Tests', () => {
 
       expect(result).toBe(mockSecretData);
       expect(mockKmsClient.getSecretValue).toHaveBeenCalledWith({
-        secretName: 'test-secret', // This is the defaultSecretName from mockConfig
+        secretName: 'test-secret', // 这是来自 mockConfig 的 defaultSecretName
       });
     });
   });
 
   describe('getSecretValueAsJson', () => {
-    it('should successfully parse JSON secret', async () => {
+    it('应该成功解析 JSON 密钥', async () => {
       const mockJsonData = { key: 'value', number: 123 };
       mockKmsClient.getSecretValue.mockResolvedValue({
         body: {
@@ -221,7 +222,7 @@ describe('KmsService Advanced API Tests', () => {
       });
     });
 
-    it('should handle JSON parsing errors', async () => {
+    it('应该处理 JSON 解析错误', async () => {
       mockKmsClient.getSecretValue.mockResolvedValue({
         body: {
           secretData: 'invalid-json-data',
@@ -232,14 +233,14 @@ describe('KmsService Advanced API Tests', () => {
         'Invalid JSON format in secret json-secret',
       );
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Failed to parse secret json-secret as JSON:',
+        '无法将密钥 json-secret 解析为 JSON:',
         expect.stringContaining('Unexpected token'),
       );
     });
   });
 
   describe('getDefaultSecretValueAsJson', () => {
-    it('should successfully parse default secret as JSON', async () => {
+    it('应该成功将默认密钥解析为 JSON', async () => {
       const mockJsonData = { default: true, value: 'test' };
       mockKmsClient.getSecretValue.mockResolvedValue({
         body: {
@@ -257,7 +258,7 @@ describe('KmsService Advanced API Tests', () => {
   });
 
   describe('getMultipleSecrets', () => {
-    it('should successfully fetch multiple secrets', async () => {
+    it('应该成功获取多个密钥', async () => {
       const secretNames = ['secret1', 'secret2', 'secret3'];
       const secretValues = ['value1', 'value2', 'value3'];
 
@@ -276,7 +277,7 @@ describe('KmsService Advanced API Tests', () => {
       expect(mockKmsClient.getSecretValue).toHaveBeenCalledTimes(3);
     });
 
-    it('should handle errors in batch operations', async () => {
+    it('应该处理批量操作中的错误', async () => {
       const secretNames = ['secret1', 'secret2'];
       const mockError = new Error('Failed to fetch secret2');
 
@@ -291,7 +292,7 @@ describe('KmsService Advanced API Tests', () => {
       );
     });
 
-    it('should handle empty secret names array', async () => {
+    it('应该处理空的密钥名称数组', async () => {
       const result = await service.getMultipleSecrets([]);
 
       expect(result).toEqual({});
@@ -300,7 +301,7 @@ describe('KmsService Advanced API Tests', () => {
   });
 
   describe('checkConnection', () => {
-    it('should return true when connection check succeeds', async () => {
+    it('当连接检查成功时应该返回 true', async () => {
       mockKmsClient.getSecretValue.mockResolvedValue({
         body: { secretData: 'test-data' },
       });
@@ -309,22 +310,22 @@ describe('KmsService Advanced API Tests', () => {
 
       expect(result).toBe(true);
       expect(mockKmsClient.getSecretValue).toHaveBeenCalledWith({
-        secretName: 'test-secret', // Default secret name
+        secretName: 'test-secret', // 默认密钥名称
       });
     });
 
-    it('should return false when connection check fails', async () => {
+    it('当连接检查失败时应该返回 false', async () => {
       const mockError = new Error('Connection failed');
       mockKmsClient.getSecretValue.mockRejectedValue(mockError);
 
       const result = await service.checkConnection();
 
       expect(result).toBe(false);
-      expect(mockLogger.error).toHaveBeenCalledWith('KMS connection check failed:', 'Connection failed');
+      expect(mockLogger.error).toHaveBeenCalledWith('KMS 连接检查失败:', 'Connection failed');
     });
 
-    it('should handle connection check without default secret', async () => {
-      // Create service without default secret
+    it('应该处理没有默认密钥的连接检查', async () => {
+      // 创建没有默认密钥的服务
       const configWithoutDefault: KmsModuleConfig = {
         ...mockConfig,
         defaultSecretName: undefined,
@@ -349,19 +350,19 @@ describe('KmsService Advanced API Tests', () => {
       const result = await testService.checkConnection();
 
       expect(result).toBe(true);
-      expect(mockLogger.warn).toHaveBeenCalledWith('No default secret configured for connection check');
+      expect(mockLogger.warn).toHaveBeenCalledWith('连接检查未配置默认密钥');
       expect(mockKmsClient.getSecretValue).not.toHaveBeenCalled();
 
       await testModule.close();
     });
   });
 
-  describe('Client configuration with toMap method', () => {
-    it('should properly configure client with endpoint', async () => {
-      // This test ensures the toMap method and endpoint configuration are covered
+  describe('使用 toMap 方法的客户端配置', () => {
+    it('应该正确配置带有端点的客户端', async () => {
+      // 此测试确保覆盖 toMap 方法和端点配置
       expect(service).toBeDefined();
 
-      // Verify that the KmsClient was called with the correct configuration
+      // 验证 KmsClient 是否使用正确的配置被调用
       expect(KmsClient).toHaveBeenCalledWith({
         accessKeyId: 'MOCKACCESSKEYIDFORTESTING',
         accessKeySecret: 'validSecretKey1234567890123456789',
@@ -370,7 +371,7 @@ describe('KmsService Advanced API Tests', () => {
         toMap: expect.any(Function),
       });
 
-      // Test the toMap function
+      // 测试 toMap 函数
       const constructorCall = (KmsClient as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
       const mappedConfig = constructorCall.toMap();
       expect(mappedConfig).toEqual({
@@ -381,7 +382,7 @@ describe('KmsService Advanced API Tests', () => {
       });
     });
 
-    it('should configure client with required endpoint', async () => {
+    it('应该使用必需的端点配置客户端', async () => {
       const configWithEndpoint: KmsModuleConfig = {
         client: {
           accessKeyId: 'MOCKACCESSKEYIDFORTESTING',
@@ -406,12 +407,12 @@ describe('KmsService Advanced API Tests', () => {
       const testService = testModule.get<KmsService>(KmsService);
       expect(testService).toBeDefined();
 
-      // Verify client configuration with required endpoint
+      // 验证带有必需端点的客户端配置
       const mockCalls = (KmsClient as unknown as ReturnType<typeof vi.fn>).mock.calls;
       const lastConstructorCall = mockCalls[mockCalls.length - 1][0];
       expect(lastConstructorCall.endpoint).toBe('https://kms.cn-hangzhou.aliyuncs.com');
 
-      // Test toMap with endpoint
+      // 使用端点测试 toMap
       const mappedConfig = lastConstructorCall.toMap();
       expect(mappedConfig.endpoint).toBe('https://kms.cn-hangzhou.aliyuncs.com');
       expect(mappedConfig.accessKeyId).toBe('MOCKACCESSKEYIDFORTESTING');
@@ -419,12 +420,12 @@ describe('KmsService Advanced API Tests', () => {
       await testModule.close();
     });
 
-    it('should use default regionId when not provided in toMap', async () => {
+    it('当在 toMap 中未提供时应该使用默认 regionId', async () => {
       const configWithoutRegion: KmsModuleConfig = {
         client: {
           accessKeyId: 'MOCKACCESSKEYIDFORTESTING',
           accessKeySecret: 'validSecretKey1234567890123456789',
-          // No regionId provided
+          // 未提供 regionId
           endpoint: 'https://kms.cn-hangzhou.aliyuncs.com',
         },
         defaultSecretName: 'test-secret',
@@ -444,12 +445,12 @@ describe('KmsService Advanced API Tests', () => {
       const testService = testModule.get<KmsService>(KmsService);
       expect(testService).toBeDefined();
 
-      // Verify client configuration uses default regionId
+      // 验证客户端配置使用默认 regionId
       const mockCalls = (KmsClient as unknown as ReturnType<typeof vi.fn>).mock.calls;
       const lastConstructorCall = mockCalls[mockCalls.length - 1][0];
       expect(lastConstructorCall.regionId).toBe('cn-hangzhou');
 
-      // Test toMap with default regionId
+      // 使用默认 regionId 测试 toMap
       const mappedConfig = lastConstructorCall.toMap();
       expect(mappedConfig.regionId).toBe('cn-hangzhou');
       expect(mappedConfig.accessKeyId).toBe('MOCKACCESSKEYIDFORTESTING');

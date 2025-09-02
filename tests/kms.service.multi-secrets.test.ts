@@ -1,6 +1,5 @@
 import { vi, beforeEach, afterEach, describe, it, expect } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import KmsClient from '@alicloud/kms20160120';
 import {
   KmsService,
   KMS_CONFIG_TOKEN,
@@ -53,7 +52,9 @@ describe('KmsService Multi-Secrets Configuration Tests', () => {
       getSecretValue: vi.fn(),
     };
 
-    (KmsClient as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => mockKmsClient);
+    // Re-establish the mock implementation after clearing
+    const KmsClientMock = (await import('@alicloud/kms20160120')).default;
+    vi.mocked(KmsClientMock).mockImplementation(() => mockKmsClient);
 
     module = await Test.createTestingModule({
       providers: [
