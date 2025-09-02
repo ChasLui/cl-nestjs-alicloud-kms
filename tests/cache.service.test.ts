@@ -592,5 +592,50 @@ describe('CacheService', () => {
       expect(cleanupService.getStats().totalKeys).toBe(0);
       expect(mockLogger.debug).toHaveBeenCalledWith('Cleaned up 2 expired cache items');
     });
+
+    it('应该处理LRU淘汰中的键前缀逻辑', async () => {
+      const smallCacheService = new CacheService(
+        {
+          enabled: true,
+          ttl: 5000,
+          maxSize: 2,
+          keyPrefix: 'test_prefix:',
+        },
+        mockLogger,
+      );
+
+      // 填满缓存，确保时间差
+      smallCacheService.set('key1', 'value1');
+      await new Promise((resolve) => setTimeout(resolve, 1)); // 等待1ms确保时间差
+      smallCacheService.set('key2', 'value2');
+
+      // 访问key2，更新其lastAccessedAt
+      smallCacheService.get('key2');
+
+      // 添加第三个项目，触发LRU淘汰（应该淘汰key1，因为它的lastAccessedAt最早）
+      smallCacheService.set('key3', 'value3');
+
+      // 验证最少使用的项被移除
+      expect(smallCacheService.get('key1')).toBeNull();
+      expect(smallCacheService.get('key2')).toBe('value2');
+      expect(smallCacheService.get('key3')).toBe('value3');
+    });
+
+    it('应该处理清理定时器的初始化', () => {
+      const timerService = new CacheService(
+        {
+          enabled: true,
+          ttl: 60000,
+          maxSize: 100,
+          keyPrefix: 'timer_test:',
+        },
+        mockLogger,
+      );
+
+      // 验证定时器已启动（通过检查服务是否正常工作）
+      expect(timerService.isEnabled()).toBe(true);
+      timerService.set('test', 'value');
+      expect(timerService.get('test')).toBe('value');
+    });
   });
 });

@@ -514,4 +514,128 @@ describe('KMS服务', () => {
       expect(mockLogger.log).toHaveBeenCalledWith('Cache warmup completed: 2/2 secrets cached');
     });
   });
+
+  describe('私有方法覆盖率测试', () => {
+    let service: KmsService;
+    let mockLogger: LoggerInterface;
+
+    interface KmsServiceWithPrivate extends KmsService {
+      extractJsonPath: (data: unknown, path: string) => string;
+      validateSecretValue: (value: string, validation: SecretValidationRule) => void;
+    }
+
+    beforeEach(async () => {
+      mockLogger = {
+        log: vi.fn(),
+        error: vi.fn(),
+        warn: vi.fn(),
+        debug: vi.fn(),
+        verbose: vi.fn(),
+      };
+
+      const mockCacheService = {
+        isEnabled: vi.fn().mockReturnValue(false),
+        clear: vi.fn(),
+        has: vi.fn(),
+        get: vi.fn(),
+        set: vi.fn(),
+        delete: vi.fn().mockReturnValue(false),
+        getStats: vi.fn(),
+      };
+
+      const testingModule = await Test.createTestingModule({
+        providers: [
+          KmsService,
+          {
+            provide: KMS_CONFIG_TOKEN,
+            useValue: {
+              region: 'cn-hangzhou',
+              accessKeyId: 'testaccesskey1234567890123456',
+              accessKeySecret: 'testsecret1234567890123456',
+              enableLogging: true,
+              client: {
+                accessKeyId: 'testaccesskey1234567890123456',
+                accessKeySecret: 'testsecret1234567890123456',
+                region: 'cn-hangzhou',
+                endpoint: 'https://kms.cn-hangzhou.aliyuncs.com',
+              },
+            },
+          },
+          {
+            provide: KMS_LOGGER_TOKEN,
+            useValue: mockLogger,
+          },
+          {
+            provide: KMS_CACHE_TOKEN,
+            useValue: mockCacheService,
+          },
+        ],
+      }).compile();
+
+      service = testingModule.get<KmsService>(KmsService);
+    });
+
+    it('应该处理extractJsonPath路径未找到的情况', () => {
+      const jsonData = { level1: { level2: 'value' } };
+      const invalidPath = 'level1.nonexistent.level3';
+
+      expect(() => {
+        (service as KmsServiceWithPrivate).extractJsonPath(jsonData, invalidPath);
+      }).toThrow('Invalid JSON path: level1.nonexistent.level3');
+    });
+
+    it('应该处理validateSecretValue的空值验证', () => {
+      const validation: SecretValidationRule = {
+        required: true,
+        minLength: 5,
+      };
+
+      expect(() => {
+        (service as KmsServiceWithPrivate).validateSecretValue('', validation);
+      }).toThrow('Secret value is required but empty');
+
+      expect(() => {
+        (service as KmsServiceWithPrivate).validateSecretValue('   ', validation);
+      }).toThrow('Secret value is required but empty');
+    });
+
+    it('应该处理clearSecretCache在缓存禁用时的情况', () => {
+      // 缓存服务被模拟为禁用状态
+      const result = service.clearSecretCache('test-secret');
+      expect(result).toBe(false);
+    });
+
+    it('应该处理extractJsonPath的undefined路径情况', () => {
+      const jsonData = { level1: { level2: undefined } };
+      const path = 'level1.level2';
+
+      expect(() => {
+        (service as KmsServiceWithPrivate).extractJsonPath(jsonData, path);
+      }).toThrow('Path not found in JSON: level1.level2');
+    });
+
+    it('应该处理extractJsonPath返回非字符串值的情况', () => {
+      const jsonData = { level1: { level2: { nested: 'value' } } };
+      const path = 'level1.level2';
+
+      const result = (service as KmsServiceWithPrivate).extractJsonPath(jsonData, path);
+      expect(result).toBe('{"nested":"value"}');
+    });
+  });
+
+  describe('配置验证覆盖率测试', () => {
+    it('应该处理缺少配置的情况', () => {
+      const testLogger = {
+        log: vi.fn(),
+        error: vi.fn(),
+        warn: vi.fn(),
+        debug: vi.fn(),
+        verbose: vi.fn(),
+      };
+
+      expect(() => {
+        new KmsService(null as unknown as KmsModuleConfig, testLogger);
+      }).toThrow('KMS configuration is required');
+    });
+  });
 });
